@@ -10,9 +10,10 @@ import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
-import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.KSPrivateKeyEntry;
+import eu.europa.esig.dss.token.KeycloakKeystoreSignatureTokenConnection;
 import eu.europa.esig.dss.token.SignatureTokenConnection;
+import eu.europa.esig.dss.validation.CertificateVerifier;
 import eu.europa.esig.dss.validation.CommonCertificateVerifier;
 import org.jboss.logging.Logger;
 import org.keycloak.crypto.KeyWrapper;
@@ -119,13 +120,13 @@ public class JAdESJwsSigningService extends SigningService<String> {
                 new KeyStore.PrivateKeyEntry((PrivateKey) signingKey.getPrivateKey(),
                         signingKey.getCertificateChain().toArray(new X509Certificate[0]));
 
-        DSSPrivateKeyEntry privateKey = new KSPrivateKeyEntry(signingKey.getProviderId(), privateKeyEntry);
+        KSPrivateKeyEntry privateKey = new KSPrivateKeyEntry(signingKey.getProviderId(), privateKeyEntry);
         parameters.setSigningCertificate(privateKey.getCertificate());
         parameters.setCertificateChain(privateKey.getCertificateChain());
-        //SignatureTokenConnection signingToken = null; //TODO
+        SignatureTokenConnection signingToken = new KeycloakKeystoreSignatureTokenConnection(signingKey);
 
         // JAdES Service init
-        CommonCertificateVerifier commonCertificateVerifier = new CommonCertificateVerifier();
+        CertificateVerifier commonCertificateVerifier = new CommonCertificateVerifier();
         JAdESService service = new JAdESService(commonCertificateVerifier);
 
         // Get data to be signed

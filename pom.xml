@@ -171,6 +171,11 @@
             <artifactId>dss-enumerations</artifactId>
             <version>${version.eu.europa.ec.joinup.sd-dss}</version>
         </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-document</artifactId>
+            <version>${version.eu.europa.ec.joinup.sd-dss}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.keycloak</groupId>
