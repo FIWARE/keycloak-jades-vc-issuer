@@ -66,7 +66,13 @@
         <version.com.google.auto.service.auto-service>1.0.1</version.com.google.auto.service.auto-service>
 
         <!-- keycloak -->
-        <version.org.keycloak.libs>21.1.2</version.org.keycloak.libs>
+        <version.org.keycloak.libs>999.0.0-20240503.054832-424</version.org.keycloak.libs>
+        <version.org.keycloak-common.libs>999.0.0-20240503.054832-425</version.org.keycloak-common.libs>
+        <version.org.keycloak-core.libs>999.0.0-20240503.054832-425</version.org.keycloak-core.libs>
+        <!--<version.org.keycloak-model-map.libs>22.0.5</version.org.keycloak-model-map.libs>-->
+
+        <!-- DSS -->
+        <version.eu.europa.ec.joinup.sd-dss>6.0</version.eu.europa.ec.joinup.sd-dss>
 
         <!-- version to be used for tests - can be different from the libs -->
         <keycloak.version>21.1.2</keycloak.version>
@@ -113,6 +119,20 @@
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
+
+        <repository>
+            <!-- Adding this repository allows development against SNAPSHOT -->
+            <id>sonatype-snapshots</id>
+            <name>Sonatype Snapshots</name>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
+            </snapshots>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -132,6 +152,27 @@
         </dependency>
 
         <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-jades</artifactId>
+            <version>${version.eu.europa.ec.joinup.sd-dss}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>specs-jades</artifactId>
+            <version>${version.eu.europa.ec.joinup.sd-dss}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-token</artifactId>
+            <version>${version.eu.europa.ec.joinup.sd-dss}</version>
+        </dependency>
+        <dependency>
+            <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+            <artifactId>dss-enumerations</artifactId>
+            <version>${version.eu.europa.ec.joinup.sd-dss}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-server-spi</artifactId>
             <version>${version.org.keycloak.libs}</version>
@@ -140,13 +181,13 @@
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-common</artifactId>
-            <version>${version.org.keycloak.libs}</version>
+            <version>${version.org.keycloak-common.libs}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-core</artifactId>
-            <version>${version.org.keycloak.libs}</version>
+            <version>${version.org.keycloak-core.libs}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -161,12 +202,12 @@
             <version>${version.org.keycloak.libs}</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-model-map</artifactId>
-            <version>${version.org.keycloak.libs}</version>
+            <version>${version.org.keycloak-model-map.libs}</version>
             <scope>provided</scope>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-model-jpa</artifactId>

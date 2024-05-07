@@ -1,5 +1,6 @@
 package org.keycloak.protocol.oid4vc.issuance.signing;
 
+import com.google.auto.service.AutoService;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
 import org.keycloak.models.KeycloakSession;
@@ -18,9 +19,11 @@ import java.util.Optional;
  *
  * @author <a href="https://github.com/dwendland">Dr. Dennis Wendland</a>
  */
+@AutoService(VCSigningServiceProviderFactory.class)
 public class JAdESJwsSigningServiceProviderFactory implements VCSigningServiceProviderFactory {
 
-    public static final Format SUPPORTED_FORMAT = "jades_jws";
+    // TODO: To be replaced with proper format
+    public static final Format SUPPORTED_FORMAT = Format.JWT_VC;
     private static final String HELP_TEXT = "Issues JAdES JWS VCs following the specification of XYZ.";
 
     @Override
@@ -54,7 +57,9 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
 
     @Override
     public String getId() {
-        return SUPPORTED_FORMAT.toString();
+        // TODO: To be replaced with proper SUPPORTED_FORMAT.toString();
+        // Value needs to match "providerId" parameter in provider config
+        return "jades-jws-signing";
     }
 
     @Override
