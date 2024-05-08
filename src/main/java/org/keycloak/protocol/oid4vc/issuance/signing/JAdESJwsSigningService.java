@@ -24,6 +24,7 @@ import org.keycloak.protocol.oid4vc.issuance.TimeProvider;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
 import org.keycloak.representations.JsonWebToken;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.security.KeyStore;
 import java.security.PrivateKey;
@@ -64,6 +65,12 @@ public class JAdESJwsSigningService extends SigningService<String> {
         signingKey = getKey(keyId, algorithmType);
         if (signingKey == null) {
             throw new SigningServiceException(String.format("No key for id %s and algorithm %s available.", keyId, algorithmType));
+        }
+        LOGGER.infof("constructor signingkey: %s", signingKey.toString());
+        try {
+            LOGGER.infof("constructor signingkey-privatekey: %s", new String(signingKey.getPrivateKey().getEncoded(), "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            LOGGER.errorf("constructor error: %s", e.toString());
         }
         SignatureProvider signatureProvider = keycloakSession.getProvider(SignatureProvider.class, algorithmType);
         signatureSignerContext = signatureProvider.signer(signingKey);
@@ -119,6 +126,10 @@ public class JAdESJwsSigningService extends SigningService<String> {
         KeyStore.PrivateKeyEntry privateKeyEntry =
                 new KeyStore.PrivateKeyEntry((PrivateKey) signingKey.getPrivateKey(),
                         signingKey.getCertificateChain().toArray(new X509Certificate[0]));
+
+        //Debug
+        LOGGER.infof("pkeyentry: %s", privateKeyEntry.toString());
+        LOGGER.infof("signingkey: %s", signingKey.toString());
 
         KSPrivateKeyEntry privateKey = new KSPrivateKeyEntry(signingKey.getProviderId(), privateKeyEntry);
         parameters.setSigningCertificate(privateKey.getCertificate());
