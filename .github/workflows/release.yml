@@ -58,6 +58,11 @@ jobs:
         run: |
           mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
 
+      - name: Build package
+        id: build-package
+        run: |
+          mvn clean install
+
       - name: Build Image
         id: build-image
         uses: redhat-actions/buildah-build@v2
