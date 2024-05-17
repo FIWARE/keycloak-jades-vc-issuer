@@ -54,14 +54,12 @@ public class JAdESJwsSigningService extends SigningService<String> {
     private final TimeProvider timeProvider;
     private final String tokenType;
     private final DigestAlgorithm digestAlgorithm;
-    protected final String issuerDid;
     private final KeyWrapper signingKey;
 
     public JAdESJwsSigningService(KeycloakSession keycloakSession, String keyId, String algorithmType,
-                                  String tokenType, String issuerDid,
+                                  String tokenType,
                                   DigestAlgorithm digestAlgorithm, TimeProvider timeProvider) {
         super(keycloakSession, keyId, algorithmType);
-        this.issuerDid = issuerDid;
         this.timeProvider = timeProvider;
         this.tokenType = tokenType;
         this.digestAlgorithm = digestAlgorithm;

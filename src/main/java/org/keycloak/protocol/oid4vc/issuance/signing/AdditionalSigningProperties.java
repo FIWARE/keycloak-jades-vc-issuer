@@ -5,7 +5,7 @@ import org.keycloak.provider.ProviderConfigProperty;
 public enum AdditionalSigningProperties {
 
     DIGEST_ALGORITHM("digestAlgorithm", "Digest Algorithm",
-            "Specify the digest ",
+            "Specify the algorithm used for computing the digest of the data to be signed.",
             ProviderConfigProperty.STRING_TYPE, "SHA256");
 
     private final String key;
