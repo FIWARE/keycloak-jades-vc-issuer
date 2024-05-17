@@ -1,36 +1,39 @@
 package org.keycloak.protocol.oid4vc.issuance.signing;
 
-import eu.europa.esig.dss.enumerations.DigestAlgorithm;
-import eu.europa.esig.dss.enumerations.JWSSerializationType;
-import eu.europa.esig.dss.enumerations.SignatureLevel;
-import eu.europa.esig.dss.enumerations.SignaturePackaging;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.europa.esig.dss.enumerations.*;
 import eu.europa.esig.dss.jades.JAdESSignatureParameters;
 import eu.europa.esig.dss.jades.signature.JAdESService;
 import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.model.InMemoryDocument;
 import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
+import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
+import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
+import eu.europa.esig.dss.spi.x509.tsp.CompositeTSPSource;
+import eu.europa.esig.dss.spi.x509.tsp.KeyEntityTSPSource;
+import eu.europa.esig.dss.spi.x509.tsp.TSPSource;
 import eu.europa.esig.dss.token.KSPrivateKeyEntry;
-import eu.europa.esig.dss.token.KeycloakKeystoreSignatureTokenConnection;
+import org.keycloak.protocol.oid4vc.issuance.token.KeycloakKeystoreSignatureTokenConnection;
 import eu.europa.esig.dss.token.SignatureTokenConnection;
 import eu.europa.esig.dss.validation.CertificateVerifier;
 import eu.europa.esig.dss.validation.CommonCertificateVerifier;
 import org.jboss.logging.Logger;
 import org.keycloak.crypto.KeyWrapper;
-import org.keycloak.crypto.SignatureProvider;
-import org.keycloak.crypto.SignatureSignerContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.protocol.oid4vc.issuance.TimeProvider;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
 import org.keycloak.representations.JsonWebToken;
 
-import java.io.UnsupportedEncodingException;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * {@link VerifiableCredentialsSigningService} implementing the JAdES JWS format. It returns a string, containing the
@@ -48,32 +51,46 @@ public class JAdESJwsSigningService extends SigningService<String> {
     private static final String VC_CLAIM_KEY = "vc";
     private static final String ID_CLAIM_KEY = "id";
 
-
-    private final SignatureSignerContext signatureSignerContext;
     private final TimeProvider timeProvider;
     private final String tokenType;
     protected final String issuerDid;
-
+    private final SignatureLevel signatureLevel;
+    private final JWSSerializationType jwsSerializationType;
+    private final List<String> onlineTspSources;
+    private final String tspSourceKeyId;
+    private final String tspSourceKeyAlgorithmType;
     private final KeyWrapper signingKey;
+    private KeyWrapper tspSourceKey = null;
 
     public JAdESJwsSigningService(KeycloakSession keycloakSession, String keyId, String algorithmType,
-                                  String tokenType, String issuerDid, TimeProvider timeProvider) {
+                                  String tokenType, String issuerDid, SignatureLevel signatureLevel,
+                                  JWSSerializationType jwsSerializationType,
+                                  List<String> onlineTspSources, String tspSourceKeyId,
+                                  String tspSourceKeyAlgorithmType, TimeProvider timeProvider) {
         super(keycloakSession, keyId, algorithmType);
         this.issuerDid = issuerDid;
         this.timeProvider = timeProvider;
         this.tokenType = tokenType;
+        this.signatureLevel = signatureLevel;
+        this.jwsSerializationType = jwsSerializationType;
+        this.onlineTspSources = onlineTspSources;
+        this.tspSourceKeyId = tspSourceKeyId;
+        this.tspSourceKeyAlgorithmType = tspSourceKeyAlgorithmType;
+
         signingKey = getKey(keyId, algorithmType);
         if (signingKey == null) {
-            throw new SigningServiceException(String.format("No key for id %s and algorithm %s available.", keyId, algorithmType));
+            throw new SigningServiceException(String.format("No key for id %s and algorithm %s available.",
+                    keyId, algorithmType));
         }
-        LOGGER.infof("constructor signingkey: %s", signingKey.toString());
-        try {
-            LOGGER.infof("constructor signingkey-privatekey: %s", new String(signingKey.getPrivateKey().getEncoded(), "UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            LOGGER.errorf("constructor error: %s", e.toString());
+
+        if (tspSourceKeyId != null && tspSourceKeyAlgorithmType != null) {
+            tspSourceKey = getKey(tspSourceKeyId, tspSourceKeyAlgorithmType);
+            if (tspSourceKey == null) {
+                throw new SigningServiceException(
+                        String.format("No key for id %s and algorithm %s available when loading TSP Source KeyStore.",
+                                keyId, algorithmType));
+            }
         }
-        SignatureProvider signatureProvider = keycloakSession.getProvider(SignatureProvider.class, algorithmType);
-        signatureSignerContext = signatureProvider.signer(signingKey);
 
         LOGGER.debugf("Successfully initiated the JAdES JWS Signing Service with algorithm %s.", algorithmType);
     }
@@ -117,19 +134,15 @@ public class JAdESJwsSigningService extends SigningService<String> {
 
         // Prepare JAdES signature parameters
         JAdESSignatureParameters parameters = new JAdESSignatureParameters();
-        parameters.setSignatureLevel(SignatureLevel.JAdES_BASELINE_B); // TODO: Make configurable
+        parameters.setSignatureLevel(signatureLevel);
         parameters.setSignaturePackaging(SignaturePackaging.ENVELOPING); // TODO: Make configurable
-        parameters.setJwsSerializationType(JWSSerializationType.COMPACT_SERIALIZATION); // TODO: Make configurable
+        parameters.setJwsSerializationType(jwsSerializationType);
         parameters.setDigestAlgorithm(DigestAlgorithm.SHA256); // TODO: Make configurable
 
         // Set certificates and key
         KeyStore.PrivateKeyEntry privateKeyEntry =
                 new KeyStore.PrivateKeyEntry((PrivateKey) signingKey.getPrivateKey(),
                         signingKey.getCertificateChain().toArray(new X509Certificate[0]));
-
-        //Debug
-        LOGGER.infof("pkeyentry: %s", privateKeyEntry.toString());
-        LOGGER.infof("signingkey: %s", signingKey.toString());
 
         KSPrivateKeyEntry privateKey = new KSPrivateKeyEntry(signingKey.getProviderId(), privateKeyEntry);
         parameters.setSigningCertificate(privateKey.getCertificate());
@@ -140,9 +153,49 @@ public class JAdESJwsSigningService extends SigningService<String> {
         CertificateVerifier commonCertificateVerifier = new CommonCertificateVerifier();
         JAdESService service = new JAdESService(commonCertificateVerifier);
 
+        // For signature level JAdES_BASELINE_T and JAdES_BASELINE_LTA, a TSP source is required
+        if (signatureLevel==SignatureLevel.JAdES_BASELINE_T || signatureLevel==SignatureLevel.JAdES_BASELINE_LTA) {
+            Map<String, TSPSource> tspSources = new HashMap<>();
+
+            // Check for online TSP sources
+            if (onlineTspSources != null && !onlineTspSources.isEmpty()) {
+                TimestampDataLoader timestampDataLoader = new TimestampDataLoader();
+                for (int i = 0; i < onlineTspSources.size(); i++) {
+                    String onlineTspSourceServer = onlineTspSources.get(i);
+                    OnlineTSPSource tsa = new OnlineTSPSource(onlineTspSourceServer);
+                    tsa.setDataLoader(timestampDataLoader);
+                    tspSources.put("TSA" + String.valueOf(i), tsa);
+                }
+            }
+
+            // Check for KeyEntity TSP Source
+            if (tspSourceKey != null) {
+                KeyEntityTSPSource keyEntityTSPSource = new KeyEntityTSPSource((PrivateKey) tspSourceKey.getPrivateKey(),
+                        tspSourceKey.getCertificate(), tspSourceKey.getCertificateChain());
+                // TODO: Set TSA Policy
+                // TODO: Set digest algorithm from config (use the same as for JADES parameters)
+                keyEntityTSPSource.setDigestAlgorithm(DigestAlgorithm.SHA256);
+                tspSources.put("TSA-Key", keyEntityTSPSource);
+            }
+
+            CompositeTSPSource tspSource = new CompositeTSPSource();
+            tspSource.setTspSources(tspSources);
+            service.setTspSource(tspSource);
+        }
+
+
         // Get data to be signed
-        LOGGER.infof("Signing: %s", jsonWebToken.toString());
-        DSSDocument toSignDocument = new InMemoryDocument(jsonWebToken.toString().getBytes());
+        ObjectMapper objectMapper = new ObjectMapper();
+        String myJson = null;
+        try {
+            objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+            myJson = objectMapper.writeValueAsString(jsonWebToken);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        DSSDocument toSignDocument = new InMemoryDocument(myJson.getBytes());
+        toSignDocument.setMimeType(MimeTypeEnum.JSON);
         ToBeSigned dataToSign = service.getDataToSign(toSignDocument, parameters);
 
         // Get signature using private key
@@ -152,7 +205,14 @@ public class JAdESJwsSigningService extends SigningService<String> {
         // Sign document
         DSSDocument signedDocument = service.signDocument(toSignDocument, parameters, signatureValue);
 
-        LOGGER.infof(signedDocument.toString());
-        return signedDocument.toString();
+        ByteArrayOutputStream stream
+                = new ByteArrayOutputStream();
+        try {
+            signedDocument.writeTo(stream);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return new String(stream.toByteArray());
     }
 }
