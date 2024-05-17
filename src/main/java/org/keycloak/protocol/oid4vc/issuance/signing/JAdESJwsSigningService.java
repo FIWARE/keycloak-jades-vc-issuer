@@ -135,12 +135,13 @@ public class JAdESJwsSigningService extends SigningService<String> {
 
         // Get data to be signed
         ObjectMapper objectMapper = new ObjectMapper();
-        String myJson = null;
+        String myJson;
         try {
             objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
             myJson = objectMapper.writeValueAsString(jsonWebToken);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new SigningServiceException(
+                    String.format("Error when serializing data to be signed: %s", e));
         }
 
         DSSDocument toSignDocument = new InMemoryDocument(myJson.getBytes());
@@ -159,7 +160,8 @@ public class JAdESJwsSigningService extends SigningService<String> {
         try {
             signedDocument.writeTo(stream);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new SigningServiceException(
+                    String.format("Error when writing signed document to output stream: %s", e));
         }
 
         return new String(stream.toByteArray());

@@ -12,11 +12,8 @@ import org.keycloak.protocol.oid4vc.model.Format;
 import org.keycloak.provider.ConfigurationValidationHelper;
 import org.keycloak.provider.ProviderConfigProperty;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-
-import org.jboss.logging.Logger;
 
 /**
  * Provider Factory to create {@link  JAdESJwsSigningService}s
@@ -28,7 +25,7 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
 
     // TODO: To be replaced with proper format
     public static final Format SUPPORTED_FORMAT = Format.JWT_VC;
-    private static final String HELP_TEXT = "Issues JAdES JWS VCs following the specification of XYZ.";
+    private static final String HELP_TEXT = "Issues JAdES JWS VCs following the specification of ETSI TS 119 182-1.";
 
     @Override
     public VerifiableCredentialsSigningService create(KeycloakSession session, ComponentModel model) {
@@ -43,7 +40,7 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
                                 .getAttribute(ISSUER_DID_REALM_ATTRIBUTE_KEY))
                 .orElseThrow(() -> new VCIssuerException("No issuerDid configured."));
 
-        // SignatureLevel (Default: JAdES_BASELINE_B) --> Digest Algo
+        // Digest Algorithm
         DigestAlgorithm digestAlgorithm = DigestAlgorithm.SHA256;
         if (model.contains(AdditionalSigningProperties.DIGEST_ALGORITHM.getKey())) {
             digestAlgorithm = DigestAlgorithm.valueOf(model.get(AdditionalSigningProperties.DIGEST_ALGORITHM.getKey()));
