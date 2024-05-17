@@ -7,13 +7,11 @@ import org.keycloak.component.ComponentValidationException;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.oid4vc.issuance.OffsetTimeProvider;
-import org.keycloak.protocol.oid4vc.issuance.VCIssuerException;
 import org.keycloak.protocol.oid4vc.model.Format;
 import org.keycloak.provider.ConfigurationValidationHelper;
 import org.keycloak.provider.ProviderConfigProperty;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Provider Factory to create {@link  JAdESJwsSigningService}s
@@ -33,12 +31,6 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
         String keyId = model.get(SigningProperties.KEY_ID.getKey());
         String algorithmType = model.get(SigningProperties.ALGORITHM_TYPE.getKey());
         String tokenType = model.get(SigningProperties.TOKEN_TYPE.getKey());
-        String issuerDid = Optional.ofNullable(
-                        session
-                                .getContext()
-                                .getRealm()
-                                .getAttribute(ISSUER_DID_REALM_ATTRIBUTE_KEY))
-                .orElseThrow(() -> new VCIssuerException("No issuerDid configured."));
 
         // Digest Algorithm
         DigestAlgorithm digestAlgorithm = DigestAlgorithm.SHA256;
@@ -46,7 +38,7 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
             digestAlgorithm = DigestAlgorithm.valueOf(model.get(AdditionalSigningProperties.DIGEST_ALGORITHM.getKey()));
         }
 
-        return new JAdESJwsSigningService(session, keyId, algorithmType, tokenType, issuerDid,
+        return new JAdESJwsSigningService(session, keyId, algorithmType, tokenType,
                 digestAlgorithm, new OffsetTimeProvider());
     }
 
@@ -75,6 +67,7 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
     @Override
     public void validateSpecificConfiguration(KeycloakSession session, RealmModel realm, ComponentModel model) throws ComponentValidationException {
         ConfigurationValidationHelper.check(model)
+                .checkRequired(SigningProperties.KEY_ID.asConfigProperty())
                 .checkRequired(SigningProperties.TOKEN_TYPE.asConfigProperty())
                 .checkRequired(SigningProperties.ALGORITHM_TYPE.asConfigProperty());
 

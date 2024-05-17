@@ -1,5 +1,6 @@
 package org.keycloak.protocol.oid4vc.issuance.token;
 
+import eu.europa.esig.dss.model.DSSException;
 import eu.europa.esig.dss.token.AbstractKeyStoreTokenConnection;
 import org.keycloak.crypto.KeyWrapper;
 
@@ -25,7 +26,7 @@ public class KeycloakKeystoreSignatureTokenConnection extends AbstractKeyStoreTo
             keyStore.load(null);
             keyStore.setKeyEntry("alias", keyWrapper.getPrivateKey(), pwdChars, keyWrapper.getCertificateChain().toArray(new java.security.cert.Certificate[0]));
         } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
-            throw new RuntimeException(e);
+            throw new DSSException(e);
         }
 
     }
