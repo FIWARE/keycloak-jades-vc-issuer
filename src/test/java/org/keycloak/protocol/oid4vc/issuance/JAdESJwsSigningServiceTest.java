@@ -13,11 +13,27 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+
+import eu.europa.esig.dss.enumerations.DigestAlgorithm;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.keycloak.TokenVerifier;
+import org.keycloak.common.VerificationException;
+import org.keycloak.crypto.KeyWrapper;
+import org.keycloak.jose.jws.JWSHeader;
+import org.keycloak.models.KeyManager;
+import org.keycloak.models.KeycloakContext;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.oid4vc.issuance.signing.JAdESJwsSigningService;
 import org.keycloak.protocol.oid4vc.model.CredentialSubject;
+import org.keycloak.protocol.oid4vc.model.Role;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
+import org.keycloak.representations.JsonWebToken;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -30,35 +46,128 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class JAdESJwsSigningServiceTest {
 
+    private final String ISSUER_DID = "";
     private JAdESJwsSigningService jAdESJwsSigningService;
+    private KeycloakSession keycloakSession;
+    private KeycloakContext context;
+    private RealmModel realmModel;
+    private KeyManager keyManager;
 
-    @Test
-    @DisplayName("Simple test")
-    void testTrue() throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException {
+    private enum SignatureAlgorithm {
+        RS256, RS512
+    }
+
+    @BeforeEach
+    public void setup() {
+        this.keycloakSession = mock(KeycloakSession.class);
+        this.context = mock(KeycloakContext.class);
+        this.keyManager = mock(KeyManager.class);
+        this.realmModel = mock(RealmModel.class);
+
+        when(keycloakSession.keys()).thenReturn(keyManager);
+        when(keycloakSession.getContext()).thenReturn(context);
+        when(context.getRealm()).thenReturn(realmModel);
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideSignatureTypes")
+    @DisplayName("Test signing valid credential")
+    public void testSignCredential(SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException {
         VerifiableCredential vc = createVC();
-        KeyStore keyStore = createClientKeyCertChain();
 
-        assertEquals(true, true, "True is true!");
+        KeyWrapper signingKey = createClientKeyCertChain(signatureAlgorithm);
+        when(keyManager.getKey(any(), eq(signatureAlgorithm.toString()), any(), anyString())).thenReturn(signingKey);
+
+        jAdESJwsSigningService = new JAdESJwsSigningService(keycloakSession, signatureAlgorithm.toString(),
+                signatureAlgorithm.toString(), tokenType, digestAlgorithm, new OffsetTimeProvider());
+
+        String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
+        System.out.println(signedCredentialJwt);
+
+
+        // Verify result
+        Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
+        verifyJwt(signedCredentialJwt, pubKey, signatureAlgorithm, tokenType, digestAlgorithm);
+    }
+
+    // Verify the signed JWT
+    private void verifyJwt(String signedJwt, Key publicKey,
+                           SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) throws VerificationException {
+        TokenVerifier<JsonWebToken> verifier = TokenVerifier.create(signedJwt, JsonWebToken.class);
+        JsonWebToken jwtPayload = verifier.getToken();
+        JWSHeader jwtHeader = verifier.getHeader();
+
+        // Verify parameters
+        String expectedHeaderAlgorithm = "RS256";
+        if (signatureAlgorithm == SignatureAlgorithm.RS256 && digestAlgorithm == DigestAlgorithm.SHA256) {
+            expectedHeaderAlgorithm = "RS256";
+        } else if (signatureAlgorithm == SignatureAlgorithm.RS512 && digestAlgorithm == DigestAlgorithm.SHA256) {
+            expectedHeaderAlgorithm = "RS256";
+        } else if (signatureAlgorithm == SignatureAlgorithm.RS256 && digestAlgorithm == DigestAlgorithm.SHA512) {
+            expectedHeaderAlgorithm = "RS512";
+        } else if (signatureAlgorithm == SignatureAlgorithm.RS512 && digestAlgorithm == DigestAlgorithm.SHA512) {
+            expectedHeaderAlgorithm = "RS512";
+        }
+
+        String expectedType = "jose";
+        assertEquals(expectedHeaderAlgorithm, jwtHeader.getAlgorithm().toString(), "Algorithm should equal expected algorithm type");
+        assertEquals(expectedType, jwtHeader.getType(), "Type in header should equal expected type");
+        assertEquals(ISSUER_DID, jwtPayload.getIssuer(), "Issuer DID should equal expected issuer");
+
+        // Verify signature
+        verifier.publicKey((PublicKey) publicKey);
+        assertDoesNotThrow(verifier::verifySignature, "Signature verification throws no exception");
+    }
+
+    private static Arguments getArguments(SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) {
+        return Arguments.of(signatureAlgorithm, tokenType, digestAlgorithm);
+    }
+
+    private static Stream<Arguments> provideSignatureTypes() {
+        return Stream.of(
+                getArguments(SignatureAlgorithm.RS256, "JWT", DigestAlgorithm.SHA256),
+                getArguments(SignatureAlgorithm.RS256, "JWT", DigestAlgorithm.SHA512)
+        );
     }
 
     // Create VC object
     private VerifiableCredential createVC() throws URISyntaxException {
         VerifiableCredential vc = new VerifiableCredential();
-        vc.setIssuer(new URI("did:elsi:VATDE-1234567"));
+        vc.setIssuer(new URI(ISSUER_DID));
         vc.setType(List.of("VerifiableCredential"));
+        vc.setIssuanceDate(new Date());
 
-        CredentialSubject credentialSubject = new CredentialSubject();
-        //credentialSubject.setClaims();
+        CredentialSubject credentialSubject = getCredentialSubject(
+                Map.of("email", "test@user.org",
+                        "familyName", "Mustermann",
+                        "firstName", "Max",
+                        "roles", Set.of(new Role(Set.of("MyRole"), "did:key:1")))
+        );
         vc.setCredentialSubject(credentialSubject);
 
         return vc;
     }
 
+    // Get a credential subject
+    private static CredentialSubject getCredentialSubject(Map<String, Object> claims) {
+        CredentialSubject credentialSubject = new CredentialSubject();
+        claims.entrySet().stream().forEach(e -> credentialSubject.setClaims(e.getKey(), e.getValue()));
+        return credentialSubject;
+    }
+
+    // Class holding a key and a certificate
     final static class KeyCert {
         public final PrivateKey key;
         public final X509Certificate cert;
@@ -69,25 +178,41 @@ public class JAdESJwsSigningServiceTest {
         }
     }
 
-    // Create key / cert chain pair
-    private KeyStore createClientKeyCertChain() throws NoSuchAlgorithmException, IOException, OperatorCreationException, CertificateException, KeyStoreException {
+    // Create key / cert chain pairs consisting of client, intermediate and root CA certificate,
+    // and return it as Keycloak KeyWrapper
+    private KeyWrapper createClientKeyCertChain(SignatureAlgorithm signatureAlgorithm) throws NoSuchAlgorithmException, IOException, OperatorCreationException, CertificateException, KeyStoreException {
 
-        KeyCert rootCAKeyCert = createKeyCert(createRootCertSubject(), null, 1L, true);
-        KeyCert intermediateKeyCert = createKeyCert(createIntermediateCertSubject(), rootCAKeyCert, 2L, true);
-        KeyCert clientKeyCert = createKeyCert(createClientCertSubject(), intermediateKeyCert, 3L, false);
+        KeyCert rootCAKeyCert = createKeyCert(signatureAlgorithm, createRootCertSubject(), null, 1L, true);
+        KeyCert intermediateKeyCert = createKeyCert(signatureAlgorithm, createIntermediateCertSubject(), rootCAKeyCert, 2L, true);
+        KeyCert clientKeyCert = createKeyCert(signatureAlgorithm, createClientCertSubject(), intermediateKeyCert, 3L, false);
 
-        char[] emptyPassword = new char[0];
-        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(null, emptyPassword);
-        keyStore.setKeyEntry("alias", clientKeyCert.key, emptyPassword,
-                new X509Certificate[]{clientKeyCert.cert, intermediateKeyCert.cert, rootCAKeyCert.cert});
+        KeyWrapper keyWrapper = new KeyWrapper();
+        keyWrapper.setPrivateKey(clientKeyCert.key);
+        keyWrapper.setCertificateChain(List.of(clientKeyCert.cert, intermediateKeyCert.cert, rootCAKeyCert.cert));
+        keyWrapper.setProviderId("java-keystore");
 
-        return keyStore;
+        return keyWrapper;
     }
 
-    private KeyCert createKeyCert(X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException {
+    // Create a private key and certificate signed by an optional issuer key
+    private KeyCert createKeyCert(SignatureAlgorithm signatureAlgorithm, X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException {
 
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        String keyGenAlgorithm = "RSA";
+        switch(signatureAlgorithm) {
+            case RS256:
+            case RS512:
+                keyGenAlgorithm = "RSA";
+                break;
+        }
+
+        String signerAlgorithm = "SHA256WithRSA";
+        switch (signatureAlgorithm) {
+            case RS256:
+                signerAlgorithm = "SHA256WithRSA";
+                break;
+        }
+
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(keyGenAlgorithm);
         kpg.initialize(4096);
         var keyPair = kpg.generateKeyPair();
 
@@ -103,7 +228,6 @@ public class JAdESJwsSigningServiceTest {
             issuerSubjectDN = subjectDN;
             issuerKey = key;
         } else {
-            //issuerSubjectDN = new X500Name(issuer.cert.getSubjectX500Principal().getName());
             issuerSubjectDN = new JcaX509CertificateHolder((X509Certificate) issuer.cert).getSubject();
             issuerKey = issuer.key;
         }
@@ -118,14 +242,15 @@ public class JAdESJwsSigningServiceTest {
         }
 
         // Sign it
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(issuerKey);
+        ContentSigner signer = new JcaContentSignerBuilder(signerAlgorithm).build(issuerKey);
         X509CertificateHolder certHolder = certBuilder.build(signer);
         X509Certificate cert = new JcaX509CertificateConverter().getCertificate(certHolder);
-        System.out.println(cert.toString());
+
         return new KeyCert(key, cert);
 
     }
 
+    // Create the subject for the root CA cert
     private X500Name createRootCertSubject() {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.C, "DE");
@@ -135,11 +260,11 @@ public class JAdESJwsSigningServiceTest {
         builder.addRDN(BCStyle.CN, "FIWARE-CA");
         builder.addRDN(BCStyle.EmailAddress, "ca@fiware.org");
         builder.addRDN(BCStyle.SERIALNUMBER, "01");
-        //X500Name rootCaName = new X500Name("C=DE,ST=Berlin,L=Berlin,O=FIWARE CA,CN=FIWARE-CA,emailAddress=ca@fiware.org,serialNumber=01");
 
         return builder.build();
     }
 
+    // Create the subject for the intermediate cert
     private X500Name createIntermediateCertSubject() {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.C, "DE");
@@ -153,6 +278,7 @@ public class JAdESJwsSigningServiceTest {
         return builder.build();
     }
 
+    // Create the subject for the client cert
     private X500Name createClientCertSubject() {
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
         builder.addRDN(BCStyle.C, "DE");
