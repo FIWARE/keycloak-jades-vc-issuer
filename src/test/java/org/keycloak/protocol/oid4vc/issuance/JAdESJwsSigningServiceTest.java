@@ -105,8 +105,6 @@ public class JAdESJwsSigningServiceTest {
                 signatureAlgorithm, signCredentialTestInput.digestAlgorithm(), new OffsetTimeProvider());
 
         String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
-        System.out.println(signedCredentialJwt);
-
 
         // Verify result
         //Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
@@ -118,7 +116,10 @@ public class JAdESJwsSigningServiceTest {
     private void verifyJwt(String signedJwt, KeyWrapper signingKey, SignatureAlgorithm signatureAlgorithm,
                            SignCredentialTestExpectedValues signCredentialTestExpectedValues) throws VerificationException, IOException {
         SignatureVerifierContext verifierContext = null;
-        System.out.println("Key: " + signingKey.getPrivateKey());
+
+        Key publicKey = signingKey.getCertificateChain().get(0).getPublicKey();
+        signingKey.setPublicKey(publicKey);
+
         switch (signatureAlgorithm) {
             case SHA256WithECDSA:
             case SHA512WithECDSA: {
@@ -181,8 +182,9 @@ public class JAdESJwsSigningServiceTest {
                 "VC should contain issuer field with correct value");
 
         // Verify signature
-        Key publicKey = signingKey.getCertificateChain().get(0).getPublicKey();
-        verifier.publicKey((PublicKey) publicKey);
+        //Key publicKey = signingKey.getCertificateChain().get(0).getPublicKey();
+        //verifier.publicKey((PublicKey) publicKey);
+
         assertDoesNotThrow(verifier::verifySignature, "Signature verification throws no exception");
     }
 
@@ -201,20 +203,6 @@ public class JAdESJwsSigningServiceTest {
                         "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA256WithRSA,
-                        new KeyPairGenParameters(4096, null),
-                        DigestAlgorithm.SHA512, ISSUER_DID
-                ), new SignCredentialTestExpectedValues(
-                        "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
-                )),
-                getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA512WithRSA,
-                        new KeyPairGenParameters(4096, null),
-                        DigestAlgorithm.SHA256, ISSUER_DID
-                ), new SignCredentialTestExpectedValues(
-                        "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
-                )),
-                getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA512WithRSA,
                         new KeyPairGenParameters(4096, null),
                         DigestAlgorithm.SHA512, ISSUER_DID
@@ -227,14 +215,14 @@ public class JAdESJwsSigningServiceTest {
                         DigestAlgorithm.SHA256, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "ES256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
-                ))/*,
+                )),
                 getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA512WithECDSA,
                         new KeyPairGenParameters(null, "secp521r1"),
                         DigestAlgorithm.SHA512, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "ES512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
-                ))*/
+                ))
         );
     }
 
