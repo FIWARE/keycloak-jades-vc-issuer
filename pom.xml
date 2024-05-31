@@ -237,6 +237,11 @@
             <version>${version.org.keycloak.libs}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-crypto-default</artifactId>
+            <version>${version.org.keycloak.libs}</version>
+        </dependency>
 
         <!-- https://mvnrepository.com/artifact/javax.validation/validation-api -->
         <dependency>

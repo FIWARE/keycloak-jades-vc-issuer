@@ -118,7 +118,7 @@ public class JAdESJwsSigningServiceTest {
     private void verifyJwt(String signedJwt, KeyWrapper signingKey, SignatureAlgorithm signatureAlgorithm,
                            SignCredentialTestExpectedValues signCredentialTestExpectedValues) throws VerificationException, IOException {
         SignatureVerifierContext verifierContext = null;
-
+        System.out.println("Key: " + signingKey.getPrivateKey());
         switch (signatureAlgorithm) {
             case SHA256WithECDSA:
             case SHA512WithECDSA: {
@@ -313,6 +313,21 @@ public class JAdESJwsSigningServiceTest {
         keyWrapper.setPrivateKey(clientKeyCert.key);
         keyWrapper.setCertificateChain(List.of(clientKeyCert.cert, intermediateKeyCert.cert, rootCAKeyCert.cert));
         keyWrapper.setProviderId("java-keystore");
+
+        switch (signatureAlgorithm) {
+            case SHA256WithRSA:
+                keyWrapper.setAlgorithm(Algorithm.RS256);
+                break;
+            case SHA512WithRSA:
+                keyWrapper.setAlgorithm(Algorithm.RS512);
+                break;
+            case SHA256WithECDSA:
+                keyWrapper.setAlgorithm(Algorithm.ES256);
+                break;
+            case SHA512WithECDSA:
+                keyWrapper.setAlgorithm(Algorithm.ES512);
+                break;
+        }
 
         return keyWrapper;
     }
