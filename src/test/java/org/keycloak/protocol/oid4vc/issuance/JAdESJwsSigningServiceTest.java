@@ -17,14 +17,18 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 import eu.europa.esig.dss.enumerations.DigestAlgorithm;
 
+import org.junit.jupiter.api.BeforeAll;
+//import org.junit.Before;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
-import org.keycloak.crypto.KeyWrapper;
+import org.keycloak.common.crypto.CryptoIntegration;
+import org.keycloak.crypto.*;
 import org.keycloak.jose.JOSEParser;
 import org.keycloak.jose.jws.JWSHeader;
 import org.keycloak.jose.jws.JWSInput;
@@ -45,6 +49,7 @@ import java.net.URISyntaxException;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.security.spec.ECGenParameterSpec;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -58,6 +63,7 @@ import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class JAdESJwsSigningServiceTest {
 
     private static final String ISSUER_DID = "did:elsi:VATDE-1234567";
@@ -68,10 +74,10 @@ public class JAdESJwsSigningServiceTest {
     private RealmModel realmModel;
     private KeyManager keyManager;
 
-
-
     @BeforeEach
     public void setup() {
+        CryptoIntegration.init(this.getClass().getClassLoader());
+
         this.keycloakSession = mock(KeycloakSession.class);
         this.context = mock(KeycloakContext.class);
         this.keyManager = mock(KeyManager.class);
@@ -87,10 +93,11 @@ public class JAdESJwsSigningServiceTest {
     @DisplayName("Test signing valid credential")
     public void testSignCredential(SignCredentialTestInput signCredentialTestInput,
                                    SignCredentialTestExpectedValues signCredentialTestExpectedValues)
-            throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException {
+            throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException, InvalidAlgorithmParameterException {
         VerifiableCredential vc = createVC(signCredentialTestInput.vcIssuer());
 
-        KeyWrapper signingKey = createClientKeyCertChain(signCredentialTestInput.signatureAlgorithm());
+        KeyWrapper signingKey = createClientKeyCertChain(signCredentialTestInput.signatureAlgorithm(),
+                signCredentialTestInput.keyPairGenParameters());
         String signatureAlgorithm = signCredentialTestInput.signatureAlgorithm().toString();
         when(keyManager.getKey(any(), eq(signatureAlgorithm), any(), anyString())).thenReturn(signingKey);
 
@@ -98,18 +105,39 @@ public class JAdESJwsSigningServiceTest {
                 signatureAlgorithm, signCredentialTestInput.digestAlgorithm(), new OffsetTimeProvider());
 
         String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
-        //System.out.println(signedCredentialJwt);
+        System.out.println(signedCredentialJwt);
 
 
         // Verify result
-        Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
-        verifyJwt(signedCredentialJwt, pubKey, signCredentialTestExpectedValues);
+        //Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
+        verifyJwt(signedCredentialJwt, signingKey,
+                signCredentialTestInput.signatureAlgorithm(), signCredentialTestExpectedValues);
     }
 
     // Verify the signed JWT
-    private void verifyJwt(String signedJwt, Key publicKey,
+    private void verifyJwt(String signedJwt, KeyWrapper signingKey, SignatureAlgorithm signatureAlgorithm,
                            SignCredentialTestExpectedValues signCredentialTestExpectedValues) throws VerificationException, IOException {
-        TokenVerifier<JsonWebToken> verifier = TokenVerifier.create(signedJwt, JsonWebToken.class);
+        SignatureVerifierContext verifierContext = null;
+
+        switch (signatureAlgorithm) {
+            case SHA256WithECDSA:
+            case SHA512WithECDSA: {
+                verifierContext = new ServerECDSASignatureVerifierContext(signingKey);
+                break;
+            }
+            case SHA256WithRSA:
+            case SHA512WithRSA: {
+                verifierContext = new AsymmetricSignatureVerifierContext(signingKey);
+                break;
+            }
+            default: {
+                fail("Algorithm not supported.");
+            }
+        }
+
+        TokenVerifier<JsonWebToken> verifier = TokenVerifier
+                .create(signedJwt, JsonWebToken.class)
+                .verifierContext(verifierContext);
         JsonWebToken jwtPayload = verifier.getToken();
         JWSHeader jwtHeader = verifier.getHeader();
         JWSInput jwsInput = (JWSInput) JOSEParser.parse(signedJwt);
@@ -153,6 +181,7 @@ public class JAdESJwsSigningServiceTest {
                 "VC should contain issuer field with correct value");
 
         // Verify signature
+        Key publicKey = signingKey.getCertificateChain().get(0).getPublicKey();
         verifier.publicKey((PublicKey) publicKey);
         assertDoesNotThrow(verifier::verifySignature, "Signature verification throws no exception");
     }
@@ -165,35 +194,63 @@ public class JAdESJwsSigningServiceTest {
     private static Stream<Arguments> provideSignatureTypes() {
         return Stream.of(
                 getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA256WithRSA, DigestAlgorithm.SHA256, ISSUER_DID
+                        SignatureAlgorithm.SHA256WithRSA,
+                        new KeyPairGenParameters(4096, null),
+                        DigestAlgorithm.SHA256, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA256WithRSA, DigestAlgorithm.SHA512, ISSUER_DID
+                        SignatureAlgorithm.SHA256WithRSA,
+                        new KeyPairGenParameters(4096, null),
+                        DigestAlgorithm.SHA512, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA512WithRSA, DigestAlgorithm.SHA256, ISSUER_DID
+                        SignatureAlgorithm.SHA512WithRSA,
+                        new KeyPairGenParameters(4096, null),
+                        DigestAlgorithm.SHA256, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
-                        SignatureAlgorithm.SHA512WithRSA, DigestAlgorithm.SHA512, ISSUER_DID
+                        SignatureAlgorithm.SHA512WithRSA,
+                        new KeyPairGenParameters(4096, null),
+                        DigestAlgorithm.SHA512, ISSUER_DID
                 ), new SignCredentialTestExpectedValues(
                         "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
-                ))
+                )),
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA256WithECDSA,
+                        new KeyPairGenParameters(null, "secp256r1"),
+                        DigestAlgorithm.SHA256, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "ES256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                ))/*,
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA512WithECDSA,
+                        new KeyPairGenParameters(null, "secp521r1"),
+                        DigestAlgorithm.SHA512, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "ES512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                ))*/
         );
     }
 
     // SignatureAlgorithm for BouncyCastle - why do they have no enum?
     // see: https://github.com/bcgit/bc-java/blob/main/pkix/src/main/java/org/bouncycastle/operator/DefaultSignatureAlgorithmIdentifierFinder.java
     private enum SignatureAlgorithm {
-        SHA256WithRSA, SHA512WithRSA
+        SHA256WithRSA, SHA512WithRSA,
+        SHA256WithECDSA, SHA512WithECDSA
     }
 
+    public record KeyPairGenParameters(Integer keySize, // RSA key size
+                                       String ecStdName // EC generation parameter standard name
+    ) {}
+
     public record SignCredentialTestInput(SignatureAlgorithm signatureAlgorithm,
+                                          KeyPairGenParameters keyPairGenParameters,
                                           DigestAlgorithm digestAlgorithm,
                                           String vcIssuer) {}
 
@@ -240,11 +297,17 @@ public class JAdESJwsSigningServiceTest {
 
     // Create key / cert chain pairs consisting of client, intermediate and root CA certificate,
     // and return it as Keycloak KeyWrapper
-    private KeyWrapper createClientKeyCertChain(SignatureAlgorithm signatureAlgorithm) throws NoSuchAlgorithmException, IOException, OperatorCreationException, CertificateException, KeyStoreException {
+    private KeyWrapper createClientKeyCertChain(SignatureAlgorithm signatureAlgorithm, KeyPairGenParameters keyPairGenParameters) throws NoSuchAlgorithmException, IOException, OperatorCreationException, CertificateException, KeyStoreException, InvalidAlgorithmParameterException {
 
-        KeyCert rootCAKeyCert = createKeyCert(signatureAlgorithm, createRootCertSubject(), null, 1L, true);
-        KeyCert intermediateKeyCert = createKeyCert(signatureAlgorithm, createIntermediateCertSubject(), rootCAKeyCert, 2L, true);
-        KeyCert clientKeyCert = createKeyCert(signatureAlgorithm, createClientCertSubject(), intermediateKeyCert, 3L, false);
+        KeyCert rootCAKeyCert = createKeyCert(
+                signatureAlgorithm, keyPairGenParameters,
+                createRootCertSubject(), null, 1L, true);
+        KeyCert intermediateKeyCert = createKeyCert(
+                signatureAlgorithm, keyPairGenParameters,
+                createIntermediateCertSubject(), rootCAKeyCert, 2L, true);
+        KeyCert clientKeyCert = createKeyCert(
+                signatureAlgorithm, keyPairGenParameters,
+                createClientCertSubject(), intermediateKeyCert, 3L, false);
 
         KeyWrapper keyWrapper = new KeyWrapper();
         keyWrapper.setPrivateKey(clientKeyCert.key);
@@ -255,28 +318,41 @@ public class JAdESJwsSigningServiceTest {
     }
 
     // Create a private key and certificate signed by an optional issuer key
-    private KeyCert createKeyCert(SignatureAlgorithm signatureAlgorithm, X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException {
+    private KeyCert createKeyCert(SignatureAlgorithm signatureAlgorithm, KeyPairGenParameters keyPairGenParameters, X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException, InvalidAlgorithmParameterException {
 
-        String keyGenAlgorithm = "RSA";
+        KeyPairGenerator kpg;
+        //String keyGenAlgorithm = "RSA";
         switch(signatureAlgorithm) {
             case SHA256WithRSA:
             case SHA512WithRSA:
-                keyGenAlgorithm = "RSA";
+                //keyGenAlgorithm = "RSA";
+                kpg = KeyPairGenerator.getInstance("RSA");
+                kpg.initialize(keyPairGenParameters.keySize());
+                break;
+            case SHA256WithECDSA:
+            case SHA512WithECDSA:
+                kpg = KeyPairGenerator.getInstance("EC");
+                kpg.initialize(new ECGenParameterSpec(keyPairGenParameters.ecStdName()));
+                break;
+            default:
+                kpg = KeyPairGenerator.getInstance("RSA");
+                kpg.initialize(keyPairGenParameters.keySize());
                 break;
         }
 
-        String signerAlgorithm = "SHA256WithRSA";
-        switch (signatureAlgorithm) {
+        //String signerAlgorithm = "SHA256WithRSA";
+        /*switch (signatureAlgorithm) {
             case SHA256WithRSA:
                 signerAlgorithm = "SHA256WithRSA";
                 break;
             case SHA512WithRSA:
                 signerAlgorithm = "SHA512WITHRSA";
                 break;
-        }
+        }*/
+        String signerAlgorithm = signatureAlgorithm.toString();
 
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance(keyGenAlgorithm);
-        kpg.initialize(4096);
+        //KeyPairGenerator kpg = KeyPairGenerator.getInstance(keyGenAlgorithm);
+        //kpg.initialize(keySize);
         var keyPair = kpg.generateKeyPair();
 
         BigInteger serialNumber = BigInteger.valueOf(serial);
