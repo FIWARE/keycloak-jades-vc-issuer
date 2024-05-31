@@ -1,5 +1,6 @@
 package org.keycloak.protocol.oid4vc.issuance;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -24,7 +25,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.crypto.KeyWrapper;
+import org.keycloak.jose.JOSEParser;
 import org.keycloak.jose.jws.JWSHeader;
+import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.models.KeyManager;
 import org.keycloak.models.KeycloakContext;
 import org.keycloak.models.KeycloakSession;
@@ -43,31 +46,29 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class JAdESJwsSigningServiceTest {
 
-    private final String ISSUER_DID = "";
+    private static final String ISSUER_DID = "did:elsi:VATDE-1234567";
+    private static int CERT_CHAIN_LENGTH = 3;
     private JAdESJwsSigningService jAdESJwsSigningService;
     private KeycloakSession keycloakSession;
     private KeycloakContext context;
     private RealmModel realmModel;
     private KeyManager keyManager;
 
-    private enum SignatureAlgorithm {
-        RS256, RS512
-    }
+
 
     @BeforeEach
     public void setup() {
@@ -84,68 +85,127 @@ public class JAdESJwsSigningServiceTest {
     @ParameterizedTest
     @MethodSource("provideSignatureTypes")
     @DisplayName("Test signing valid credential")
-    public void testSignCredential(SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException {
-        VerifiableCredential vc = createVC();
+    public void testSignCredential(SignCredentialTestInput signCredentialTestInput,
+                                   SignCredentialTestExpectedValues signCredentialTestExpectedValues)
+            throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException {
+        VerifiableCredential vc = createVC(signCredentialTestInput.vcIssuer());
 
-        KeyWrapper signingKey = createClientKeyCertChain(signatureAlgorithm);
-        when(keyManager.getKey(any(), eq(signatureAlgorithm.toString()), any(), anyString())).thenReturn(signingKey);
+        KeyWrapper signingKey = createClientKeyCertChain(signCredentialTestInput.signatureAlgorithm());
+        String signatureAlgorithm = signCredentialTestInput.signatureAlgorithm().toString();
+        when(keyManager.getKey(any(), eq(signatureAlgorithm), any(), anyString())).thenReturn(signingKey);
 
-        jAdESJwsSigningService = new JAdESJwsSigningService(keycloakSession, signatureAlgorithm.toString(),
-                signatureAlgorithm.toString(), tokenType, digestAlgorithm, new OffsetTimeProvider());
+        jAdESJwsSigningService = new JAdESJwsSigningService(keycloakSession, signatureAlgorithm,
+                signatureAlgorithm, signCredentialTestInput.digestAlgorithm(), new OffsetTimeProvider());
 
         String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
-        System.out.println(signedCredentialJwt);
+        //System.out.println(signedCredentialJwt);
 
 
         // Verify result
         Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
-        verifyJwt(signedCredentialJwt, pubKey, signatureAlgorithm, tokenType, digestAlgorithm);
+        verifyJwt(signedCredentialJwt, pubKey, signCredentialTestExpectedValues);
     }
 
     // Verify the signed JWT
     private void verifyJwt(String signedJwt, Key publicKey,
-                           SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) throws VerificationException {
+                           SignCredentialTestExpectedValues signCredentialTestExpectedValues) throws VerificationException, IOException {
         TokenVerifier<JsonWebToken> verifier = TokenVerifier.create(signedJwt, JsonWebToken.class);
         JsonWebToken jwtPayload = verifier.getToken();
         JWSHeader jwtHeader = verifier.getHeader();
+        JWSInput jwsInput = (JWSInput) JOSEParser.parse(signedJwt);
+        Map headers = new ObjectMapper().readValue(
+                java.util.Base64.getDecoder().decode(jwsInput.getEncodedHeader()),
+                Map.class);
 
-        // Verify parameters
-        String expectedHeaderAlgorithm = "RS256";
-        if (signatureAlgorithm == SignatureAlgorithm.RS256 && digestAlgorithm == DigestAlgorithm.SHA256) {
-            expectedHeaderAlgorithm = "RS256";
-        } else if (signatureAlgorithm == SignatureAlgorithm.RS512 && digestAlgorithm == DigestAlgorithm.SHA256) {
-            expectedHeaderAlgorithm = "RS256";
-        } else if (signatureAlgorithm == SignatureAlgorithm.RS256 && digestAlgorithm == DigestAlgorithm.SHA512) {
-            expectedHeaderAlgorithm = "RS512";
-        } else if (signatureAlgorithm == SignatureAlgorithm.RS512 && digestAlgorithm == DigestAlgorithm.SHA512) {
-            expectedHeaderAlgorithm = "RS512";
+        // Verify header parameters
+        assertEquals(signCredentialTestExpectedValues.headerAlgorithm(), jwtHeader.getAlgorithm().toString(),
+                "Algorithm should equal expected algorithm type");
+        assertEquals(signCredentialTestExpectedValues.headerType(), jwtHeader.getType(),
+                "Type in header should equal expected type");
+        assertEquals(signCredentialTestExpectedValues.headerX5cLength(), ((List) headers.get("x5c")).size(),
+                "x5c header should have correct size");
+
+        // Header: sigT
+        assertTrue(headers.containsKey("sigT"),
+                "Header should contain 'sigT'");
+
+        try {
+            ZonedDateTime tokenTime = ZonedDateTime.parse((String) headers.get("sigT"),
+                    DateTimeFormatter.ISO_ZONED_DATE_TIME);
+            assertTrue(tokenTime.isBefore(ZonedDateTime.now()),
+                    "Header 'sigT' timestamp should be in the past");
+        } catch (DateTimeParseException dtpe) {
+            fail("Header 'sigT' timestamp should have correct format");
         }
 
-        String expectedType = "jose";
-        assertEquals(expectedHeaderAlgorithm, jwtHeader.getAlgorithm().toString(), "Algorithm should equal expected algorithm type");
-        assertEquals(expectedType, jwtHeader.getType(), "Type in header should equal expected type");
-        assertEquals(ISSUER_DID, jwtPayload.getIssuer(), "Issuer DID should equal expected issuer");
+        assertTrue( ((List) headers.get("crit")).contains("sigT"),
+                "Header 'crit' should contain 'sigT'" );
+
+
+        // Verify payload
+        assertEquals(signCredentialTestExpectedValues.vcIssuer(), jwtPayload.getIssuer(),
+                "Issuer DID should equal expected issuer");
+        assertTrue(jwtPayload.getOtherClaims().containsKey("vc"),
+                "Payload should contain VerifiableCredential vc.");
+
+        Map verifiableCredential = (Map) jwtPayload.getOtherClaims().get("vc");
+        assertEquals(signCredentialTestExpectedValues.vcIssuer(), verifiableCredential.get("issuer"),
+                "VC should contain issuer field with correct value");
 
         // Verify signature
         verifier.publicKey((PublicKey) publicKey);
         assertDoesNotThrow(verifier::verifySignature, "Signature verification throws no exception");
     }
 
-    private static Arguments getArguments(SignatureAlgorithm signatureAlgorithm, String tokenType, DigestAlgorithm digestAlgorithm) {
-        return Arguments.of(signatureAlgorithm, tokenType, digestAlgorithm);
+    private static Arguments getArguments(SignCredentialTestInput signCredentialTestInput,
+                                          SignCredentialTestExpectedValues signCredentialTestExpectedValues) {
+        return Arguments.of(signCredentialTestInput, signCredentialTestExpectedValues);
     }
 
     private static Stream<Arguments> provideSignatureTypes() {
         return Stream.of(
-                getArguments(SignatureAlgorithm.RS256, "JWT", DigestAlgorithm.SHA256),
-                getArguments(SignatureAlgorithm.RS256, "JWT", DigestAlgorithm.SHA512)
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA256WithRSA, DigestAlgorithm.SHA256, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                )),
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA256WithRSA, DigestAlgorithm.SHA512, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                )),
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA512WithRSA, DigestAlgorithm.SHA256, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                )),
+                getArguments(new SignCredentialTestInput(
+                        SignatureAlgorithm.SHA512WithRSA, DigestAlgorithm.SHA512, ISSUER_DID
+                ), new SignCredentialTestExpectedValues(
+                        "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                ))
         );
     }
 
+    // SignatureAlgorithm for BouncyCastle - why do they have no enum?
+    // see: https://github.com/bcgit/bc-java/blob/main/pkix/src/main/java/org/bouncycastle/operator/DefaultSignatureAlgorithmIdentifierFinder.java
+    private enum SignatureAlgorithm {
+        SHA256WithRSA, SHA512WithRSA
+    }
+
+    public record SignCredentialTestInput(SignatureAlgorithm signatureAlgorithm,
+                                          DigestAlgorithm digestAlgorithm,
+                                          String vcIssuer) {}
+
+    public record SignCredentialTestExpectedValues(String headerAlgorithm,
+                                                   String headerType,
+                                                   int headerX5cLength,
+                                                   String vcIssuer) {}
+
     // Create VC object
-    private VerifiableCredential createVC() throws URISyntaxException {
+    private VerifiableCredential createVC(String issuer) throws URISyntaxException {
         VerifiableCredential vc = new VerifiableCredential();
-        vc.setIssuer(new URI(ISSUER_DID));
+        vc.setIssuer(new URI(issuer));
         vc.setType(List.of("VerifiableCredential"));
         vc.setIssuanceDate(new Date());
 
@@ -199,16 +259,19 @@ public class JAdESJwsSigningServiceTest {
 
         String keyGenAlgorithm = "RSA";
         switch(signatureAlgorithm) {
-            case RS256:
-            case RS512:
+            case SHA256WithRSA:
+            case SHA512WithRSA:
                 keyGenAlgorithm = "RSA";
                 break;
         }
 
         String signerAlgorithm = "SHA256WithRSA";
         switch (signatureAlgorithm) {
-            case RS256:
+            case SHA256WithRSA:
                 signerAlgorithm = "SHA256WithRSA";
+                break;
+            case SHA512WithRSA:
+                signerAlgorithm = "SHA512WITHRSA";
                 break;
         }
 
