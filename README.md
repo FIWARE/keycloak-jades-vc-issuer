@@ -70,7 +70,6 @@ Following parameters can be configured for the provider in the realm configurati
 |-----------|-----------|---------|-------------|
 | `keyId`   | yes       |         | ID of the Keycloak KeyProvider key used for signing credentials |
 | `algorithmType` | yes |         | Algorithm type of the key |
-| `tokenType` | yes     |         | Type of the token to be issued |
 | `digestAlgorithm`| no | `"SHA256"` | Algorithm used for computing the digest of the data to be signed |
 
 
