@@ -8,6 +8,9 @@ clients and issue
 [JAdES Digital Signatures](https://www.etsi.org/deliver/etsi_ts/119100_119199/11918201/01.01.01_60/ts_11918201v010101p.pdf) 
 through the [OIDC4VCI-Protocol](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) to compliant wallets.
 
+> :warning: This plugin requires classes from the package `org.keycloak.protocol.oid4vc`, introducing the issuer for Verifiable Credentials 
+> as experimental feature with Keycloak release 25. Until this is available, a nightly build should be used.
+
 
 
 ## Background

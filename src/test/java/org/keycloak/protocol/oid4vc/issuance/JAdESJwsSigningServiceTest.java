@@ -17,11 +17,8 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 import eu.europa.esig.dss.enumerations.DigestAlgorithm;
 
-import org.junit.jupiter.api.BeforeAll;
-//import org.junit.Before;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -63,7 +60,6 @@ import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-//@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class JAdESJwsSigningServiceTest {
 
     private static final String ISSUER_DID = "did:elsi:VATDE-1234567";
