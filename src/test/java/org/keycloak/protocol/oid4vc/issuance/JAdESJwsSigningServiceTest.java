@@ -107,7 +107,6 @@ public class JAdESJwsSigningServiceTest {
         String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
 
         // Verify result
-        //Key pubKey = signingKey.getCertificateChain().get(0).getPublicKey();
         verifyJwt(signedCredentialJwt, signingKey,
                 signCredentialTestInput.signatureAlgorithm(), signCredentialTestExpectedValues);
     }
@@ -182,9 +181,6 @@ public class JAdESJwsSigningServiceTest {
                 "VC should contain issuer field with correct value");
 
         // Verify signature
-        //Key publicKey = signingKey.getCertificateChain().get(0).getPublicKey();
-        //verifier.publicKey((PublicKey) publicKey);
-
         assertDoesNotThrow(verifier::verifySignature, "Signature verification throws no exception");
     }
 
@@ -324,7 +320,6 @@ public class JAdESJwsSigningServiceTest {
     private KeyCert createKeyCert(SignatureAlgorithm signatureAlgorithm, KeyPairGenParameters keyPairGenParameters, X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException, InvalidAlgorithmParameterException {
 
         KeyPairGenerator kpg;
-        //String keyGenAlgorithm = "RSA";
         switch(signatureAlgorithm) {
             case SHA256WithRSA:
             case SHA512WithRSA:
@@ -343,19 +338,7 @@ public class JAdESJwsSigningServiceTest {
                 break;
         }
 
-        //String signerAlgorithm = "SHA256WithRSA";
-        /*switch (signatureAlgorithm) {
-            case SHA256WithRSA:
-                signerAlgorithm = "SHA256WithRSA";
-                break;
-            case SHA512WithRSA:
-                signerAlgorithm = "SHA512WITHRSA";
-                break;
-        }*/
         String signerAlgorithm = signatureAlgorithm.toString();
-
-        //KeyPairGenerator kpg = KeyPairGenerator.getInstance(keyGenAlgorithm);
-        //kpg.initialize(keySize);
         var keyPair = kpg.generateKeyPair();
 
         BigInteger serialNumber = BigInteger.valueOf(serial);
