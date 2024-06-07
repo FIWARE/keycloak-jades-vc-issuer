@@ -37,8 +37,11 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
             digestAlgorithm = DigestAlgorithm.valueOf(model.get(AdditionalSigningProperties.DIGEST_ALGORITHM.getKey()));
         }
 
+        // Include typ in signed header?
+        boolean includeSignatureType = model.get(AdditionalSigningProperties.INCLUDE_SIGNATURE_TYPE.getKey(), false);
+
         return new JAdESJwsSigningService(session, keyId, algorithmType,
-                digestAlgorithm, new OffsetTimeProvider());
+                digestAlgorithm, includeSignatureType, new OffsetTimeProvider());
     }
 
     @Override

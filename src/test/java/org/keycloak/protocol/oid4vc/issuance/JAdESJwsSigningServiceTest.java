@@ -98,7 +98,8 @@ public class JAdESJwsSigningServiceTest {
         when(keyManager.getKey(any(), eq(signatureAlgorithm), any(), anyString())).thenReturn(signingKey);
 
         jAdESJwsSigningService = new JAdESJwsSigningService(keycloakSession, signatureAlgorithm,
-                signatureAlgorithm, signCredentialTestInput.digestAlgorithm(), new OffsetTimeProvider());
+                signatureAlgorithm, signCredentialTestInput.digestAlgorithm(),
+                signCredentialTestInput.includeSignatureType(), new OffsetTimeProvider());
 
         String signedCredentialJwt = jAdESJwsSigningService.signCredential(vc);
 
@@ -144,8 +145,12 @@ public class JAdESJwsSigningServiceTest {
         // Verify header parameters
         assertEquals(signCredentialTestExpectedValues.headerAlgorithm(), jwtHeader.getAlgorithm().toString(),
                 "Algorithm should equal expected algorithm type");
-        assertEquals(signCredentialTestExpectedValues.headerType(), jwtHeader.getType(),
-                "Type in header should equal expected type");
+        if (signCredentialTestExpectedValues.headerType() != null) {
+            assertEquals(signCredentialTestExpectedValues.headerType(), jwtHeader.getType(),
+                    "Type in header should equal expected type");
+        } else {
+            assertNull(jwtHeader.getType(), "Header should not contain parameter 'typ'");
+        }
         assertEquals(signCredentialTestExpectedValues.headerX5cLength(), ((List) headers.get("x5c")).size(),
                 "x5c header should have correct size");
 
@@ -190,30 +195,30 @@ public class JAdESJwsSigningServiceTest {
                 getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA256WithRSA,
                         new KeyPairGenParameters(4096, null),
-                        DigestAlgorithm.SHA256, ISSUER_DID
+                        DigestAlgorithm.SHA256, ISSUER_DID, false
                 ), new SignCredentialTestExpectedValues(
-                        "RS256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                        "RS256", null, CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA512WithRSA,
                         new KeyPairGenParameters(4096, null),
-                        DigestAlgorithm.SHA512, ISSUER_DID
+                        DigestAlgorithm.SHA512, ISSUER_DID, false
                 ), new SignCredentialTestExpectedValues(
-                        "RS512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                        "RS512", null, CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA256WithECDSA,
                         new KeyPairGenParameters(null, "secp256r1"),
-                        DigestAlgorithm.SHA256, ISSUER_DID
+                        DigestAlgorithm.SHA256, ISSUER_DID, false
                 ), new SignCredentialTestExpectedValues(
-                        "ES256", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                        "ES256", null, CERT_CHAIN_LENGTH, ISSUER_DID
                 )),
                 getArguments(new SignCredentialTestInput(
                         SignatureAlgorithm.SHA512WithECDSA,
                         new KeyPairGenParameters(null, "secp521r1"),
-                        DigestAlgorithm.SHA512, ISSUER_DID
+                        DigestAlgorithm.SHA512, ISSUER_DID, false
                 ), new SignCredentialTestExpectedValues(
-                        "ES512", "jose", CERT_CHAIN_LENGTH, ISSUER_DID
+                        "ES512", null, CERT_CHAIN_LENGTH, ISSUER_DID
                 ))
         );
     }
@@ -232,7 +237,8 @@ public class JAdESJwsSigningServiceTest {
     public record SignCredentialTestInput(SignatureAlgorithm signatureAlgorithm,
                                           KeyPairGenParameters keyPairGenParameters,
                                           DigestAlgorithm digestAlgorithm,
-                                          String vcIssuer) {}
+                                          String vcIssuer,
+                                          boolean includeSignatureType) {}
 
     public record SignCredentialTestExpectedValues(String headerAlgorithm,
                                                    String headerType,
