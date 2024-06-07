@@ -71,6 +71,7 @@ Following parameters can be configured for the provider in the realm configurati
 | `keyId`   | yes       |         | ID of the Keycloak KeyProvider key used for signing credentials |
 | `algorithmType` | yes |         | Algorithm type of the key |
 | `digestAlgorithm`| no | `"SHA256"` | Algorithm used for computing the digest of the data to be signed |
+| `includeSignatureType` | no | `false`| Sets if the signature MimeType string must be included into the signed header ('typ' attribute) | 
 
 
 
