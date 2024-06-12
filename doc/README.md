@@ -81,7 +81,8 @@ For the next requests, the issuer metadata is required:
 curl --location '<CREDENTIAL_ISSUER>/openid-credential-issuer'
 ```
 This returns the authorization server in the field `authorization_servers`, credential endpoint (field: `credential_endpoint`) 
-and the credential format (field `format` for the credential configuration with ID `verifiable-credential`). 
+and the credential format (field `format` for the credential configuration with ID `verifiable-credential` as specified in the 
+`attributes` of the client with ID `did:web:test-marketplace.org`). 
 
 Next is to obtain the OpenID config from the authorization server:
 ```shell
@@ -104,9 +105,9 @@ curl --location '<CREDENTIAL_ENDPOINT>' \
 --header 'Authorization: Bearer <ACCESS_TOKEN>' \
 --header 'Content-Type: application/json' \
 --data '{
-    "format": "jwt_vc",
+    "format": "<CREDENTIAL_FORMAT>",
     "credential_identifier": "verifiable-credential"
 }'
 ```
-The credential is returned in the field `credential`.
+The credential is returned in the field `credential` and could be now used to authenticate at certain services.
 
