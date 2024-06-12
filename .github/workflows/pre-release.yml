@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: quay.io
-  REPOSITORY: dwendland
+  REPOSITORY: fiware
   IMAGE: keycloak-jades-vc-issuer
   PLUGIN: jades-vc-issuer
 
