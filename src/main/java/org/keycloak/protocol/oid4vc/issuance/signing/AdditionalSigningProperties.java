@@ -6,7 +6,10 @@ public enum AdditionalSigningProperties {
 
     DIGEST_ALGORITHM("digestAlgorithm", "Digest Algorithm",
             "Specify the algorithm used for computing the digest of the data to be signed.",
-            ProviderConfigProperty.STRING_TYPE, "SHA256");
+            ProviderConfigProperty.STRING_TYPE, "SHA256"),
+    INCLUDE_SIGNATURE_TYPE("includeSignatureType", "Include signature MimeType",
+            "Sets if the signature MimeType string must be included into the signed header ('typ' attribute)",
+            ProviderConfigProperty.BOOLEAN_TYPE, false);
 
     private final String key;
     private final String label;

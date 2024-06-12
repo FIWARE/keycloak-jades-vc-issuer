@@ -1,0 +1,18 @@
+version: '3.4'
+services:
+
+  keycloak:
+
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: keycloak
+    command: start-dev --features oid4vc-vci --import-realm --verbose
+    volumes:
+      - ./realm_data:/opt/keycloak/data/import
+      - ./providers:/opt/keycloak/providers
+      - ./keystore:/keystore
+    ports:
+      - 8080:8080
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+
