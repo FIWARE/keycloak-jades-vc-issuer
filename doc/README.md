@@ -82,7 +82,7 @@ curl --location '<CREDENTIAL_ISSUER>/openid-credential-issuer'
 ```
 This returns the authorization server in the field `authorization_servers`, credential endpoint (field: `credential_endpoint`) 
 and the credential format (field `format` for the credential configuration with ID `verifiable-credential` as specified in the 
-`attributes` of the client with ID `did:web:test-marketplace.org`). 
+`attributes` of the client with ID `did:web:test-marketplace.org` in the realm config). 
 
 Next is to obtain the OpenID config from the authorization server:
 ```shell
