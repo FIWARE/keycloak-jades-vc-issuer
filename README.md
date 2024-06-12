@@ -40,14 +40,14 @@ The Keycloak JAdES VC Issuer therefor extends Keycloak with such functionality b
 ### Jar-File
 
 The JAdES VC Issuer is a fully-self-contained provider, thus its jar-file only has to be added to the ```providers```-folder
-of Keycloak(typically under ```/opt/keycloak/providers```). Keycloak will automatically pick up the provider at
+of Keycloak (typically under ```/opt/keycloak/providers```). Keycloak will automatically pick up the provider at
 start-time. The plugin is available as jar-file
-through [the github-releases](https://github.com/dwendland/keycloak-jades-vc-issuer/releases).
+through [the github-releases](https://github.com/fiware/keycloak-jades-vc-issuer/releases).
 
 ### OCI-Container
 
 In order to ease the deployment in containerized environments, a container including the jar-file is available
-at [quay.io](https://quay.io/repository/dwendland/keycloak-jades-vc-issuer). The container can be used in containerized
+at [quay.io](https://quay.io/repository/fiware/keycloak-jades-vc-issuer). The container can be used in containerized
 environments, to copy the jar file into a Keycloak instance, without having to manipulate the Keycloak-Image itself. 
 
 
