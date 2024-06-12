@@ -30,7 +30,6 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
 
         String keyId = model.get(SigningProperties.KEY_ID.getKey());
         String algorithmType = model.get(SigningProperties.ALGORITHM_TYPE.getKey());
-        String tokenType = model.get(SigningProperties.TOKEN_TYPE.getKey());
 
         // Digest Algorithm
         DigestAlgorithm digestAlgorithm = DigestAlgorithm.SHA256;
@@ -38,8 +37,11 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
             digestAlgorithm = DigestAlgorithm.valueOf(model.get(AdditionalSigningProperties.DIGEST_ALGORITHM.getKey()));
         }
 
-        return new JAdESJwsSigningService(session, keyId, algorithmType, tokenType,
-                digestAlgorithm, new OffsetTimeProvider());
+        // Include typ in signed header?
+        boolean includeSignatureType = model.get(AdditionalSigningProperties.INCLUDE_SIGNATURE_TYPE.getKey(), false);
+
+        return new JAdESJwsSigningService(session, keyId, algorithmType,
+                digestAlgorithm, includeSignatureType, new OffsetTimeProvider());
     }
 
     @Override

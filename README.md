@@ -8,6 +8,9 @@ clients and issue
 [JAdES Digital Signatures](https://www.etsi.org/deliver/etsi_ts/119100_119199/11918201/01.01.01_60/ts_11918201v010101p.pdf) 
 through the [OIDC4VCI-Protocol](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html) to compliant wallets.
 
+> :warning: This plugin requires classes from the package `org.keycloak.protocol.oid4vc`, which introduce the issuer for Verifiable Credentials 
+> as experimental feature with Keycloak release 25. This plugin won't work with releases older than 25.
+
 
 
 ## Background
@@ -67,9 +70,15 @@ Following parameters can be configured for the provider in the realm configurati
 |-----------|-----------|---------|-------------|
 | `keyId`   | yes       |         | ID of the Keycloak KeyProvider key used for signing credentials |
 | `algorithmType` | yes |         | Algorithm type of the key |
-| `tokenType` | yes     |         | Type of the token to be issued |
 | `digestAlgorithm`| no | `"SHA256"` | Algorithm used for computing the digest of the data to be signed |
+| `includeSignatureType` | no | `false`| Sets if the signature MimeType string must be included into the signed header ('typ' attribute) | 
 
+
+
+### Example
+
+The directory [./doc](./doc) provides an example for running Keycloak with the plugin using `docker-compose`. The description 
+also lists example requests for obtaining a credential.
 
 
 

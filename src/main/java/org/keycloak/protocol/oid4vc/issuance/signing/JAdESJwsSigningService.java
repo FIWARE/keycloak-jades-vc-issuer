@@ -52,17 +52,17 @@ public class JAdESJwsSigningService extends SigningService<String> {
     private static final String ID_CLAIM_KEY = "id";
 
     private final TimeProvider timeProvider;
-    private final String tokenType;
     private final DigestAlgorithm digestAlgorithm;
+    private final boolean includeSignatureType;
     private final KeyWrapper signingKey;
 
     public JAdESJwsSigningService(KeycloakSession keycloakSession, String keyId, String algorithmType,
-                                  String tokenType,
-                                  DigestAlgorithm digestAlgorithm, TimeProvider timeProvider) {
+                                  DigestAlgorithm digestAlgorithm, boolean includeSignatureType,
+                                  TimeProvider timeProvider) {
         super(keycloakSession, keyId, algorithmType);
         this.timeProvider = timeProvider;
-        this.tokenType = tokenType;
         this.digestAlgorithm = digestAlgorithm;
+        this.includeSignatureType = includeSignatureType;
 
         signingKey = getKey(keyId, algorithmType);
         if (signingKey == null) {
@@ -116,6 +116,13 @@ public class JAdESJwsSigningService extends SigningService<String> {
         parameters.setSignaturePackaging(SignaturePackaging.ENVELOPING);
         parameters.setJwsSerializationType(JWSSerializationType.COMPACT_SERIALIZATION);
         parameters.setDigestAlgorithm(digestAlgorithm);
+
+        // Per default, DSS sets the typ header parameter to "jose"
+        // See: https://github.com/esig/dss/blob/9ad259927d215fb85eb51b004129b9fc701cf177/dss-jades/src/main/java/eu/europa/esig/dss/jades/signature/JAdESLevelBaselineB.java#L277
+        // This is in conflict to the W3C jwt-vc data model: https://www.w3.org/TR/vc-data-model/#jwt-encoding
+        // According to RfC7515, the typ parameter is optional: https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.9
+        // Therefore disabling the setting of the typ parameter here per default (can be overridden with config)
+        parameters.setIncludeSignatureType(includeSignatureType);
 
         // Set certificates and key
         KeyStore.PrivateKeyEntry privateKeyEntry =
