@@ -60,22 +60,22 @@
 
         <!-- lazy dev -->
         <version.org.apache.maven.plugins.maven-clean-plugin>3.2.0</version.org.apache.maven.plugins.maven-clean-plugin>
-        <version.org.projectlombok>1.18.24</version.org.projectlombok>
+        <version.org.projectlombok>1.18.36</version.org.projectlombok>
         <version.org.openapitools.generator-maven-plugin>6.3.0</version.org.openapitools.generator-maven-plugin>
         <version.io.swagger.swagger-annotations>1.6.9</version.io.swagger.swagger-annotations>
         <version.com.google.auto.service.auto-service>1.0.1</version.com.google.auto.service.auto-service>
 
         <!-- keycloak -->
-        <version.org.keycloak.libs>999.0.0-20240503.054832-424</version.org.keycloak.libs>
-        <version.org.keycloak-common.libs>999.0.0-20240503.054832-425</version.org.keycloak-common.libs>
-        <version.org.keycloak-core.libs>999.0.0-20240503.054832-425</version.org.keycloak-core.libs>
+        <version.org.keycloak.libs>26.0.7</version.org.keycloak.libs>
+        <version.org.keycloak-common.libs>26.0.7</version.org.keycloak-common.libs>
+        <version.org.keycloak-core.libs>26.0.7</version.org.keycloak-core.libs>
         <!--<version.org.keycloak-model-map.libs>22.0.5</version.org.keycloak-model-map.libs>-->
 
         <!-- DSS -->
         <version.eu.europa.ec.joinup.sd-dss>6.0</version.eu.europa.ec.joinup.sd-dss>
 
         <!-- version to be used for tests - can be different from the libs -->
-        <keycloak.version>21.1.2</keycloak.version>
+        <keycloak.version>26.0.7</keycloak.version>
         <keycloak.image>quay.io/keycloak/keycloak:${keycloak.version}</keycloak.image>
         <version.io.quarkus>3.2.0.Final</version.io.quarkus>
 
