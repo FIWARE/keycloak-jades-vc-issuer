@@ -27,6 +27,7 @@ import org.keycloak.protocol.oid4vc.issuance.token.KeycloakKeystoreSignatureToke
 import org.keycloak.protocol.oid4vc.model.Format;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
 import org.keycloak.representations.JsonWebToken;
+import org.keycloak.services.util.ObjectMapperResolver;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,6 +37,7 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.UUID;
 
 /**
@@ -144,7 +146,9 @@ public class JAdESJwsSigningService extends SigningService<String> {
 		JAdESService service = new JAdESService(commonCertificateVerifier);
 
 		// Get data to be signed
-		ObjectMapper objectMapper = new ObjectMapper();
+		ServiceLoader<ObjectMapperResolver> somr = ServiceLoader.load(ObjectMapperResolver.class);
+
+		ObjectMapper objectMapper = somr.findFirst().map(omr -> omr.getContext(ObjectMapper.class)).orElse(new ObjectMapper());
 		String myJson;
 		try {
 			objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
