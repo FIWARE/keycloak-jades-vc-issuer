@@ -28,6 +28,7 @@ import org.keycloak.protocol.oid4vc.model.Format;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
 import org.keycloak.representations.JsonWebToken;
 import org.keycloak.services.util.ObjectMapperResolver;
+import org.keycloak.util.JsonSerialization;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -145,15 +146,10 @@ public class JAdESJwsSigningService extends SigningService<String> {
 		CertificateVerifier commonCertificateVerifier = new CommonCertificateVerifier();
 		JAdESService service = new JAdESService(commonCertificateVerifier);
 
-		// Get data to be signed
-		ServiceLoader<ObjectMapperResolver> somr = ServiceLoader.load(ObjectMapperResolver.class);
-
-		ObjectMapper objectMapper = somr.findFirst().map(omr -> omr.getContext(ObjectMapper.class)).orElse(new ObjectMapper());
 		String myJson;
 		try {
-			objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-			myJson = objectMapper.writeValueAsString(jsonWebToken);
-		} catch (JsonProcessingException e) {
+			myJson = JsonSerialization.writeValueAsString(jsonWebToken);
+		} catch (IOException e) {
 			throw new SigningServiceException(
 					String.format("Error when serializing data to be signed: %s", e));
 		}
