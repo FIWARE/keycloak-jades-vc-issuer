@@ -156,7 +156,11 @@
             <version>${version.com.google.auto.service.auto-service}</version>
             <optional>true</optional>
         </dependency>
-
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.18.2</version>
+        </dependency>
         <!-- DSS -->
         <dependency>
             <groupId>eu.europa.ec.joinup.sd-dss</groupId>
@@ -427,7 +431,8 @@
                 <version>${version.org.apache.maven.plugins.maven-surfire-plugin}</version>
                 <configuration>
                     <argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED --add-opens
-                        java.base/java.time=ALL-UNNAMED</argLine>
+                        java.base/java.time=ALL-UNNAMED
+                    </argLine>
                 </configuration>
             </plugin>
             <plugin>
