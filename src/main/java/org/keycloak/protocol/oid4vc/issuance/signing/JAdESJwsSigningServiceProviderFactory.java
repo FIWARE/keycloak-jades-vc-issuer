@@ -22,7 +22,7 @@ import java.util.List;
 public class JAdESJwsSigningServiceProviderFactory implements VCSigningServiceProviderFactory {
 
     // TODO: To be replaced with proper format
-    public static final Format SUPPORTED_FORMAT = Format.JWT_VC;
+    public static final String SUPPORTED_FORMAT = "jwt_vc";
     private static final String HELP_TEXT = "Issues JAdES JWS VCs following the specification of ETSI TS 119 182-1.";
 
     @Override
@@ -76,7 +76,7 @@ public class JAdESJwsSigningServiceProviderFactory implements VCSigningServicePr
     }
 
     @Override
-    public Format supportedFormat() {
+    public String supportedFormat() {
         return SUPPORTED_FORMAT;
     }
 
