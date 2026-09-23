@@ -9,6 +9,7 @@ import org.keycloak.protocol.oid4vc.issuance.credentialbuilder.SdJwtJAdESCredent
 import org.keycloak.protocol.oid4vc.model.CredentialBuildConfig;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
  * {@link CredentialSigner} for the {@code dc+sd-jwt} format, signing the issuer-signed JWT as a JAdES JWS
@@ -64,7 +65,12 @@ public class SdJwtJAdESCredentialSigner extends AbstractJAdESCredentialSigner {
         }
 
         byte[] payload = delegate.getIssuerSignedJWT().getPayload().toString().getBytes(StandardCharsets.UTF_8);
-        String jadesJws = signAsJAdES(payload, credentialBuildConfig, JAdESCredentialFormat.DC_SD_JWT);
+        // the credential configuration may name the type explicitly; SD-JWT VC mandates
+        // dc+sd-jwt, so that is the fallback rather than leaving the header to DSS
+        String signatureType = Optional.ofNullable(credentialBuildConfig.getTokenJwsType())
+                .filter(type -> !type.isBlank())
+                .orElse(JAdESCredentialFormat.DC_SD_JWT);
+        String jadesJws = signAsJAdES(payload, credentialBuildConfig, signatureType);
 
         return jadesJws + keycloakSignedSdJwt.substring(firstDisclosure);
     }

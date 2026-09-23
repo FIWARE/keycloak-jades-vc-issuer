@@ -66,15 +66,23 @@ public class JAdESCredentialBuilder implements CredentialBuilder {
             return keycloakCredentialBuilder.buildCredentialBody(verifiableCredential, credentialBuildConfig);
         }
 
+        // The issuer is not carried by the credential itself - it comes from the credential
+        // configuration, exactly as Keycloak's own JwtCredentialBuilder resolves it.
+        if (credentialBuildConfig.getCredentialIssuer() != null) {
+            verifiableCredential.setIssuer(credentialBuildConfig.getCredentialIssuer());
+        }
+        String issuer = Optional.ofNullable(verifiableCredential.getIssuer())
+                .map(Object::toString)
+                .orElseThrow(() -> new CredentialBuilderException(
+                        "Neither the credential nor its build config names an issuer."));
+
         // nbf is mandatory, so fall back to the current time when the credential carries no issuance date
         long iat = Optional.ofNullable(verifiableCredential.getIssuanceDate())
                 .map(Instant::getEpochSecond)
                 .orElse((long) timeProvider.currentTimeSeconds());
 
         JsonWebToken jsonWebToken = new JsonWebToken()
-                .issuer(Optional.ofNullable(verifiableCredential.getIssuer())
-                        .map(Object::toString)
-                        .orElseThrow(() -> new CredentialBuilderException("The credential has no issuer.")))
+                .issuer(issuer)
                 .nbf(iat)
                 .id(createCredentialId(verifiableCredential));
         jsonWebToken.setOtherClaims(VC_CLAIM_KEY, verifiableCredential);

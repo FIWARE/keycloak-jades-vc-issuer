@@ -22,12 +22,6 @@ import java.nio.charset.StandardCharsets;
  */
 public class JAdESCredentialSigner extends AbstractJAdESCredentialSigner {
 
-    /**
-     * The W3C jwt-vc data model does not ask for a {@code typ}, and RFC 7515 makes it optional, so the
-     * header is left to the {@code includeSignatureType} setting rather than forced to a value.
-     */
-    private static final String NO_FORCED_SIGNATURE_TYPE = null;
-
     private final JwtCredentialSigner keycloakCredentialSigner;
 
     public JAdESCredentialSigner(KeycloakSession keycloakSession, DigestAlgorithm digestAlgorithm,
@@ -53,6 +47,10 @@ public class JAdESCredentialSigner extends AbstractJAdESCredentialSigner {
             throw new CredentialSignerException("Error when serializing data to be signed.", e);
         }
 
-        return signAsJAdES(payload, credentialBuildConfig, NO_FORCED_SIGNATURE_TYPE);
+        // Keycloak's own builder takes the typ header from the credential configuration
+        // (`credential_build_config.token_jws_type`); honour the same setting here. When it is
+        // unset the header is left to `includeSignatureType`, since the W3C jwt-vc data model
+        // does not require a typ and RFC 7515 makes it optional.
+        return signAsJAdES(payload, credentialBuildConfig, credentialBuildConfig.getTokenJwsType());
     }
 }

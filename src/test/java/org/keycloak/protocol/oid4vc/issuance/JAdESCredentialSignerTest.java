@@ -102,7 +102,9 @@ public class JAdESCredentialSignerTest {
 		// since 26.4 the claim set is assembled by a CredentialBuilder and only then handed to the signer
 		CredentialBuildConfig credentialBuildConfig = new CredentialBuildConfig()
 				.setSigningKeyId(signatureAlgorithm)
-				.setSigningAlgorithm(signatureAlgorithm);
+				.setSigningAlgorithm(signatureAlgorithm)
+				// the realm configures the typ header through credential_build_config.token_jws_type
+				.setTokenJwsType(signCredentialTestExpectedValues.headerType());
 		CredentialBody credentialBody = new JAdESCredentialBuilder(new OffsetTimeProvider(), keycloakSession)
 				.buildCredentialBody(vc, credentialBuildConfig);
 
@@ -227,6 +229,14 @@ public class JAdESCredentialSignerTest {
 						DigestAlgorithm.SHA512, ISSUER_DID, false
 				), new SignCredentialTestExpectedValues(
 						"ES512", null, KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
+				)),
+				// token_jws_type from the credential configuration reaches the protected header
+				getArguments(new SignCredentialTestInput(
+						KeyCertFixtures.SignatureAlgorithm.SHA256WithRSA,
+						new KeyCertFixtures.KeyPairGenParameters(4096, null),
+						DigestAlgorithm.SHA256, ISSUER_DID, false
+				), new SignCredentialTestExpectedValues(
+						"RS256", "JWT", KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
 				))
 		);
 	}
