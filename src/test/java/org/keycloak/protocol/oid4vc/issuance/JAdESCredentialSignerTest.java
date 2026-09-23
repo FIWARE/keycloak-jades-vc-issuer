@@ -33,7 +33,10 @@ import org.keycloak.models.KeyManager;
 import org.keycloak.models.KeycloakContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
-import org.keycloak.protocol.oid4vc.issuance.signing.JAdESJwsSigningService;
+import org.keycloak.protocol.oid4vc.issuance.credentialbuilder.CredentialBody;
+import org.keycloak.protocol.oid4vc.issuance.credentialbuilder.JAdESCredentialBuilder;
+import org.keycloak.protocol.oid4vc.issuance.signing.JAdESCredentialSigner;
+import org.keycloak.protocol.oid4vc.model.CredentialBuildConfig;
 import org.keycloak.protocol.oid4vc.model.CredentialSubject;
 import org.keycloak.protocol.oid4vc.model.Role;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
@@ -60,11 +63,11 @@ import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class JAdESJwsSigningServiceTest {
+public class JAdESCredentialSignerTest {
 
 	private static final String ISSUER_DID = "did:elsi:VATDE-1234567";
 	private static int CERT_CHAIN_LENGTH = 3;
-	private JAdESJwsSigningService jAdESJwsSigningService;
+	private JAdESCredentialSigner jAdESCredentialSigner;
 	private KeycloakSession keycloakSession;
 	private KeycloakContext context;
 	private RealmModel realmModel;
@@ -97,14 +100,17 @@ public class JAdESJwsSigningServiceTest {
 		String signatureAlgorithm = signCredentialTestInput.signatureAlgorithm().toString();
 		when(keyManager.getKey(any(), eq(signatureAlgorithm), any(), anyString())).thenReturn(signingKey);
 
-		jAdESJwsSigningService = new JAdESJwsSigningService(keycloakSession, signatureAlgorithm,
-				signatureAlgorithm, signCredentialTestInput.digestAlgorithm(),
-				signCredentialTestInput.includeSignatureType(), new OffsetTimeProvider());
+		// since 26.4 the claim set is assembled by a CredentialBuilder and only then handed to the signer
+		CredentialBuildConfig credentialBuildConfig = new CredentialBuildConfig()
+				.setSigningKeyId(signatureAlgorithm)
+				.setSigningAlgorithm(signatureAlgorithm);
+		CredentialBody credentialBody = new JAdESCredentialBuilder(new OffsetTimeProvider())
+				.buildCredentialBody(vc, credentialBuildConfig);
 
-		VCIssuanceContext vcIssuanceContext = new VCIssuanceContext();
-		vcIssuanceContext.setVerifiableCredential(vc);
+		jAdESCredentialSigner = new JAdESCredentialSigner(keycloakSession,
+				signCredentialTestInput.digestAlgorithm(), signCredentialTestInput.includeSignatureType());
 
-		String signedCredentialJwt = jAdESJwsSigningService.signCredential(vcIssuanceContext);
+		String signedCredentialJwt = jAdESCredentialSigner.signCredential(credentialBody, credentialBuildConfig);
 
 		// Verify result
 		verifyJwt(signedCredentialJwt, signingKey,

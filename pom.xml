@@ -66,16 +66,43 @@
         <version.com.google.auto.service.auto-service>1.0.1</version.com.google.auto.service.auto-service>
 
         <!-- keycloak -->
-        <version.org.keycloak.libs>26.0.7</version.org.keycloak.libs>
-        <version.org.keycloak-common.libs>26.0.7</version.org.keycloak-common.libs>
-        <version.org.keycloak-core.libs>26.0.7</version.org.keycloak-core.libs>
+        <version.org.keycloak.libs>26.7.3</version.org.keycloak.libs>
+        <version.org.keycloak-common.libs>26.7.3</version.org.keycloak-common.libs>
+        <version.org.keycloak-core.libs>26.7.3</version.org.keycloak-core.libs>
         <!--<version.org.keycloak-model-map.libs>22.0.5</version.org.keycloak-model-map.libs>-->
 
         <!-- DSS -->
         <version.eu.europa.ec.joinup.sd-dss>6.0</version.eu.europa.ec.joinup.sd-dss>
 
+        <!--
+            Libraries the Keycloak distribution already ships in lib/main. They are declared "provided"
+            below so that they are compiled against but never copied into target/lib, and therefore never
+            land in /opt/keycloak/providers. A second copy on the classpath breaks the server: two
+            jakarta.xml.bind-api jars make Hibernate's JAXBContext lookup fail with
+            "org.glassfish.jaxb.runtime.v2.JAXBContextFactory not a subtype" during the Quarkus build.
+
+            Keep these aligned with the Keycloak release in ${keycloak.version}. To re-derive the list:
+              mvn dependency:list -DincludeScope=runtime
+            and compare the artifact ids against `ls /opt/keycloak/lib/lib/main` of the server image.
+        -->
+        <version.com.fasterxml.jackson>2.21.5</version.com.fasterxml.jackson>
+        <version.com.fasterxml.jackson.annotations>2.21</version.com.fasterxml.jackson.annotations>
+        <version.org.bouncycastle>1.84</version.org.bouncycastle>
+        <version.org.glassfish.jaxb>4.0.8</version.org.glassfish.jaxb>
+        <version.jakarta.xml.bind-api>4.0.5</version.jakarta.xml.bind-api>
+        <version.jakarta.activation-api>2.1.4</version.jakarta.activation-api>
+        <version.org.eclipse.angus.angus-activation>2.0.3</version.org.eclipse.angus.angus-activation>
+        <version.com.sun.istack.istack-commons-runtime>3.0.10</version.com.sun.istack.istack-commons-runtime>
+        <version.com.google.guava>33.5.0-jre</version.com.google.guava>
+        <version.com.google.errorprone.error_prone_annotations>2.47.0</version.com.google.errorprone.error_prone_annotations>
+        <version.commons-codec>1.21.0</version.commons-codec>
+        <version.commons-io>2.21.0</version.commons-io>
+        <version.org.apache.commons.commons-lang3>3.20.0</version.org.apache.commons.commons-lang3>
+        <version.org.apache.commons.commons-collections4>4.5.0</version.org.apache.commons.commons-collections4>
+        <version.org.slf4j>2.0.17</version.org.slf4j>
+
         <!-- version to be used for tests - can be different from the libs -->
-        <keycloak.version>26.0.7</keycloak.version>
+        <keycloak.version>26.7.3</keycloak.version>
         <keycloak.image>quay.io/keycloak/keycloak:${keycloak.version}</keycloak.image>
         <version.io.quarkus>3.2.0.Final</version.io.quarkus>
 
@@ -103,8 +130,6 @@
         </version.org.apache.maven.plugins.maven-compiler-plugin>
         <version.com.google.code.findbugs.jsr305>3.0.2</version.com.google.code.findbugs.jsr305>
         <version.com.sun.crypto.sunjce_provider>1.4.2</version.com.sun.crypto.sunjce_provider>
-        <version.org.bouncycastle.bcpkix-jdk18on>1.78</version.org.bouncycastle.bcpkix-jdk18on>
-        <version.org.bouncycastle.bcprov-jdk18on>1.78</version.org.bouncycastle.bcprov-jdk18on>
         <coveralls.token>myToken</coveralls.token>
         <jacoco.reportFolder>${project.build.directory}/jacoco/${artifactId}</jacoco.reportFolder>
         <jacoco.utReportFile>${jacoco.reportFolder}/test.exec</jacoco.utReportFile>
@@ -159,7 +184,8 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.18.2</version>
+            <version>${version.com.fasterxml.jackson}</version>
+            <scope>provided</scope>
         </dependency>
         <!-- DSS -->
         <dependency>
@@ -245,6 +271,7 @@
             <groupId>org.keycloak</groupId>
             <artifactId>keycloak-crypto-default</artifactId>
             <version>${version.org.keycloak.libs}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/javax.validation/validation-api -->
@@ -305,14 +332,131 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
-            <version>${version.org.bouncycastle.bcprov-jdk18on}</version>
+            <version>${version.org.bouncycastle}</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk18on -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
-            <version>${version.org.bouncycastle.bcpkix-jdk18on}</version>
+            <version>${version.org.bouncycastle}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcutil-jdk18on</artifactId>
+            <version>${version.org.bouncycastle}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Provided by the Keycloak server - see the version block above. Declaring them directly at
+            depth 1 makes Maven's nearest-wins mediation apply the "provided" scope to every transitive
+            path that would otherwise pull them in (mainly DSS), keeping them out of the shipped lib/.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${version.com.fasterxml.jackson}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${version.com.fasterxml.jackson}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${version.com.fasterxml.jackson.annotations}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>${version.jakarta.xml.bind-api}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>${version.org.glassfish.jaxb}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-core</artifactId>
+            <version>${version.org.glassfish.jaxb}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>txw2</artifactId>
+            <version>${version.org.glassfish.jaxb}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.istack</groupId>
+            <artifactId>istack-commons-runtime</artifactId>
+            <version>${version.com.sun.istack.istack-commons-runtime}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.activation</groupId>
+            <artifactId>jakarta.activation-api</artifactId>
+            <version>${version.jakarta.activation-api}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>angus-activation</artifactId>
+            <version>${version.org.eclipse.angus.angus-activation}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${version.com.google.guava}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+            <version>${version.com.google.errorprone.error_prone_annotations}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>${version.commons-codec}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${version.commons-io}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${version.org.apache.commons.commons-lang3}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>${version.org.apache.commons.commons-collections4}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${version.org.slf4j}</version>
+            <scope>provided</scope>
         </dependency>
 
     </dependencies>
