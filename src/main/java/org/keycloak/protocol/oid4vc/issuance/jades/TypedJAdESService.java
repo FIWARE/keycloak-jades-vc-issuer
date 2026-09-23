@@ -6,7 +6,7 @@ import eu.europa.esig.dss.jades.signature.JAdESCompactBuilder;
 import eu.europa.esig.dss.jades.signature.JAdESService;
 import eu.europa.esig.dss.jades.validation.JWS;
 import eu.europa.esig.dss.model.DSSDocument;
-import eu.europa.esig.dss.validation.CertificateVerifier;
+import eu.europa.esig.dss.spi.validation.CertificateVerifier;
 
 import java.util.List;
 

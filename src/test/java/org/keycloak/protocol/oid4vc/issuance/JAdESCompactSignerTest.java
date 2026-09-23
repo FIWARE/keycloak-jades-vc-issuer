@@ -32,7 +32,12 @@ public class JAdESCompactSignerTest {
 
     private static final String PAYLOAD = "{\"iss\":\"did:elsi:VATDE-1234567\"}";
     private static final String SD_JWT_TYPE = "dc+sd-jwt";
-    private static final String SIGNING_TIME_HEADER = "sigT";
+    /**
+     * Since ETSI TS 119 182-1 v1.2 the signing time is the registered {@code iat} claim rather than the
+     * JAdES-specific {@code sigT}, and because {@code iat} is registered it is no longer listed in
+     * {@code crit} - DSS 6.5 emits no {@code crit} header at all for baseline-B.
+     */
+    private static final String SIGNING_TIME_HEADER = "iat";
     private static final String CRITICAL_HEADER = "crit";
     private static final String TYPE_HEADER = "typ";
     private static final String X5C_HEADER = "x5c";
@@ -80,8 +85,8 @@ public class JAdESCompactSignerTest {
 
         assertEquals(KeyCertFixtures.CERT_CHAIN_LENGTH, ((List<?>) header.get(X5C_HEADER)).size(),
                 "x5c header should carry the full certificate chain");
-        assertTrue(header.containsKey(SIGNING_TIME_HEADER), "Header should contain 'sigT'");
-        assertTrue(((List<?>) header.get(CRITICAL_HEADER)).contains(SIGNING_TIME_HEADER),
-                "Header 'crit' should contain 'sigT'");
+        assertTrue(header.containsKey(SIGNING_TIME_HEADER), "Header should contain the signing time 'iat'");
+        assertFalse(header.containsKey(CRITICAL_HEADER),
+                "Baseline-B should need no 'crit' header, since 'iat' is a registered claim");
     }
 }

@@ -164,21 +164,17 @@ public class JAdESCredentialSignerTest {
 		assertEquals(signCredentialTestExpectedValues.headerX5cLength(), ((List) headers.get("x5c")).size(),
 				"x5c header should have correct size");
 
-		// Header: sigT
-		assertTrue(headers.containsKey("sigT"),
-				"Header should contain 'sigT'");
+		// Header: iat. Since ETSI TS 119 182-1 v1.2 the signing time is the registered `iat`
+		// claim instead of the JAdES-specific `sigT`, and needs no `crit` entry as a result.
+		assertTrue(headers.containsKey("iat"),
+				"Header should contain the signing time 'iat'");
 
-		try {
-			ZonedDateTime tokenTime = ZonedDateTime.parse((String) headers.get("sigT"),
-					DateTimeFormatter.ISO_ZONED_DATE_TIME);
-			assertTrue(tokenTime.isBefore(ZonedDateTime.now()),
-					"Header 'sigT' timestamp should be in the past");
-		} catch (DateTimeParseException dtpe) {
-			fail("Header 'sigT' timestamp should have correct format");
-		}
+		long signingTime = ((Number) headers.get("iat")).longValue();
+		assertTrue(signingTime <= Instant.now().getEpochSecond(),
+				"Header 'iat' timestamp should be in the past");
 
-		assertTrue(((List) headers.get("crit")).contains("sigT"),
-				"Header 'crit' should contain 'sigT'");
+		assertFalse(headers.containsKey("crit"),
+				"Baseline-B should need no 'crit' header, since 'iat' is a registered claim");
 
 
 		// Verify payload

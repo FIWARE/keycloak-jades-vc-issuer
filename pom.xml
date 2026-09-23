@@ -108,6 +108,7 @@
         <version.org.apache.commons.commons-lang3>3.20.0</version.org.apache.commons.commons-lang3>
         <version.org.apache.commons.commons-collections4>4.5.0</version.org.apache.commons.commons-collections4>
         <version.org.slf4j>2.0.17</version.org.slf4j>
+        <version.org.yaml.snakeyaml>2.0</version.org.yaml.snakeyaml>
 
         <!-- version to be used for tests - can be different from the libs -->
         <keycloak.version>26.7.3</keycloak.version>
@@ -464,6 +465,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${version.org.slf4j}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>${version.org.yaml.snakeyaml}</version>
             <scope>provided</scope>
         </dependency>
 

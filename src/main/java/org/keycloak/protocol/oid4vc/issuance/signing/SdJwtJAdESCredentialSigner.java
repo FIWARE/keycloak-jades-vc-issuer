@@ -24,10 +24,10 @@ import java.util.Optional;
  * alternative is to drive {@code SdJwt.Builder} directly and depend on when it does and does not sign,
  * which is not part of its published contract.
  * <p>
- * Note that JAdES lists {@code sigT} in the {@code crit} header, and RFC 7515 section 4.1.11 requires a
- * verifier that does not implement a critical extension to reject the JWS. Wallets that do not implement
- * JAdES will refuse such a credential, which is why {@code dc+sd-jwt} does not default to JAdES - see
- * {@link JAdESCredentialFormat}.
+ * Since ETSI TS 119 182-1 v1.2 the signing time is carried in the registered {@code iat} claim rather
+ * than the JAdES-specific {@code sigT}, so baseline-B emits no {@code crit} header and a JAdES-signed
+ * SD-JWT stays readable by wallets that do not implement JAdES. {@code dc+sd-jwt} still defaults to
+ * Keycloak's own signer, which already adds {@code x5c} - see {@link JAdESCredentialFormat}.
  *
  * @author <a href="https://github.com/dwendland">Dr. Dennis Wendland</a>
  */

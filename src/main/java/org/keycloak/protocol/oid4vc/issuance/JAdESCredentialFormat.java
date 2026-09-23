@@ -38,9 +38,15 @@ public final class JAdESCredentialFormat {
      * <p>
      * {@code jwt_vc_json} defaults to JAdES because Keycloak's own JWT signer writes no {@code x5c}
      * header at all, so an eIDAS deployment would silently lose its certificate chain. {@code dc+sd-jwt}
-     * defaults to off because Keycloak already adds {@code x5c} there itself, and because JAdES puts
-     * {@code sigT} into the {@code crit} header - which RFC 7515 requires a verifier to reject when it
-     * does not implement the extension, as SD-JWT VC wallets generally do not.
+     * defaults to off because Keycloak already adds {@code x5c} there itself, so JAdES buys only the
+     * signing time.
+     * <p>
+     * That default was originally also about interoperability: JAdES used to put {@code sigT} into the
+     * {@code crit} header, and RFC 7515 requires a verifier that does not implement a critical extension
+     * to reject the JWS outright. Since ETSI TS 119 182-1 v1.2 the signing time is the registered
+     * {@code iat} claim and needs no {@code crit} entry, so a JAdES-signed SD-JWT is no longer rejected
+     * by wallets that know nothing of JAdES. Turning this default around is therefore a deliberate
+     * choice rather than a compatibility risk.
      */
     private static final Map<String, Boolean> JADES_ENABLED_BY_DEFAULT = Map.of(
             JWT_VC_JSON, true,
