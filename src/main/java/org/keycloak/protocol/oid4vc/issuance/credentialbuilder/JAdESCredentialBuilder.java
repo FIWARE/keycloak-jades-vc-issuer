@@ -1,7 +1,11 @@
 package org.keycloak.protocol.oid4vc.issuance.credentialbuilder;
 
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.oid4vci.CredentialScopeModel;
 import org.keycloak.protocol.oid4vc.issuance.JAdESCredentialFormat;
+import org.keycloak.protocol.oid4vc.issuance.JAdESSigningPolicy;
 import org.keycloak.protocol.oid4vc.issuance.TimeProvider;
+import org.keycloak.protocol.oid4vc.model.SupportedCredentialConfiguration;
 import org.keycloak.protocol.oid4vc.model.CredentialBuildConfig;
 import org.keycloak.protocol.oid4vc.model.VerifiableCredential;
 import org.keycloak.representations.JsonWebToken;
@@ -14,6 +18,9 @@ import java.util.UUID;
 /**
  * {@link CredentialBuilder} assembling the JWT claim set of a W3C VC 1.1 credential, following the
  * JWT encoding rules of the VC data model.
+ * <p>
+ * Credentials whose configuration switched JAdES off are built by Keycloak's own
+ * {@link JwtCredentialBuilder} instead, so the built-in behaviour stays reachable per credential type.
  *
  * @author <a href="https://github.com/dwendland">Dr. Dennis Wendland</a>
  */
@@ -24,9 +31,13 @@ public class JAdESCredentialBuilder implements CredentialBuilder {
     private static final String ID_CLAIM_KEY = "id";
 
     private final TimeProvider timeProvider;
+    private final JwtCredentialBuilder keycloakCredentialBuilder;
+    private final JAdESSigningPolicy signingPolicy;
 
-    public JAdESCredentialBuilder(TimeProvider timeProvider) {
+    public JAdESCredentialBuilder(TimeProvider timeProvider, KeycloakSession keycloakSession) {
         this.timeProvider = timeProvider;
+        this.keycloakCredentialBuilder = new JwtCredentialBuilder(timeProvider, keycloakSession);
+        this.signingPolicy = new JAdESSigningPolicy(keycloakSession);
     }
 
     /**
@@ -47,9 +58,13 @@ public class JAdESCredentialBuilder implements CredentialBuilder {
     }
 
     @Override
-    public JAdESCredentialBody buildCredentialBody(VerifiableCredential verifiableCredential,
-                                                   CredentialBuildConfig credentialBuildConfig)
+    public CredentialBody buildCredentialBody(VerifiableCredential verifiableCredential,
+                                              CredentialBuildConfig credentialBuildConfig)
             throws CredentialBuilderException {
+
+        if (!signingPolicy.isJAdESEnabled(credentialBuildConfig, JAdESCredentialFormat.JWT_VC_JSON)) {
+            return keycloakCredentialBuilder.buildCredentialBody(verifiableCredential, credentialBuildConfig);
+        }
 
         // nbf is mandatory, so fall back to the current time when the credential carries no issuance date
         long iat = Optional.ofNullable(verifiableCredential.getIssuanceDate())
@@ -75,5 +90,11 @@ public class JAdESCredentialBuilder implements CredentialBuilder {
                 .ifPresent(jsonWebToken::subject);
 
         return new JAdESCredentialBody(jsonWebToken);
+    }
+
+    @Override
+    public void contributeToMetadata(SupportedCredentialConfiguration supportedCredentialConfiguration,
+                                     CredentialScopeModel credentialScopeModel) {
+        keycloakCredentialBuilder.contributeToMetadata(supportedCredentialConfiguration, credentialScopeModel);
     }
 }

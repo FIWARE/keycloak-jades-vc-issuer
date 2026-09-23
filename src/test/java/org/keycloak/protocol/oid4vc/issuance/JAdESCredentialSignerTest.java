@@ -66,7 +66,6 @@ import static org.mockito.Mockito.when;
 public class JAdESCredentialSignerTest {
 
 	private static final String ISSUER_DID = "did:elsi:VATDE-1234567";
-	private static int CERT_CHAIN_LENGTH = 3;
 	private JAdESCredentialSigner jAdESCredentialSigner;
 	private KeycloakSession keycloakSession;
 	private KeycloakContext context;
@@ -95,7 +94,7 @@ public class JAdESCredentialSignerTest {
 			throws URISyntaxException, CertificateException, NoSuchAlgorithmException, OperatorCreationException, IOException, KeyStoreException, VerificationException, InvalidAlgorithmParameterException {
 		VerifiableCredential vc = createVC(signCredentialTestInput.vcIssuer());
 
-		KeyWrapper signingKey = createClientKeyCertChain(signCredentialTestInput.signatureAlgorithm(),
+		KeyWrapper signingKey = KeyCertFixtures.createClientKeyCertChain(signCredentialTestInput.signatureAlgorithm(),
 				signCredentialTestInput.keyPairGenParameters());
 		String signatureAlgorithm = signCredentialTestInput.signatureAlgorithm().toString();
 		when(keyManager.getKey(any(), eq(signatureAlgorithm), any(), anyString())).thenReturn(signingKey);
@@ -104,7 +103,7 @@ public class JAdESCredentialSignerTest {
 		CredentialBuildConfig credentialBuildConfig = new CredentialBuildConfig()
 				.setSigningKeyId(signatureAlgorithm)
 				.setSigningAlgorithm(signatureAlgorithm);
-		CredentialBody credentialBody = new JAdESCredentialBuilder(new OffsetTimeProvider())
+		CredentialBody credentialBody = new JAdESCredentialBuilder(new OffsetTimeProvider(), keycloakSession)
 				.buildCredentialBody(vc, credentialBuildConfig);
 
 		jAdESCredentialSigner = new JAdESCredentialSigner(keycloakSession,
@@ -118,7 +117,7 @@ public class JAdESCredentialSignerTest {
 	}
 
 	// Verify the signed JWT
-	private void verifyJwt(String signedJwt, KeyWrapper signingKey, SignatureAlgorithm signatureAlgorithm,
+	private void verifyJwt(String signedJwt, KeyWrapper signingKey, KeyCertFixtures.SignatureAlgorithm signatureAlgorithm,
 						   SignCredentialTestExpectedValues signCredentialTestExpectedValues) throws VerificationException, IOException {
 		SignatureVerifierContext verifierContext = null;
 
@@ -202,50 +201,38 @@ public class JAdESCredentialSignerTest {
 	private static Stream<Arguments> provideSignatureTypes() {
 		return Stream.of(
 				getArguments(new SignCredentialTestInput(
-						SignatureAlgorithm.SHA256WithRSA,
-						new KeyPairGenParameters(4096, null),
+						KeyCertFixtures.SignatureAlgorithm.SHA256WithRSA,
+						new KeyCertFixtures.KeyPairGenParameters(4096, null),
 						DigestAlgorithm.SHA256, ISSUER_DID, false
 				), new SignCredentialTestExpectedValues(
-						"RS256", null, CERT_CHAIN_LENGTH, ISSUER_DID
+						"RS256", null, KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
 				)),
 				getArguments(new SignCredentialTestInput(
-						SignatureAlgorithm.SHA512WithRSA,
-						new KeyPairGenParameters(4096, null),
+						KeyCertFixtures.SignatureAlgorithm.SHA512WithRSA,
+						new KeyCertFixtures.KeyPairGenParameters(4096, null),
 						DigestAlgorithm.SHA512, ISSUER_DID, false
 				), new SignCredentialTestExpectedValues(
-						"RS512", null, CERT_CHAIN_LENGTH, ISSUER_DID
+						"RS512", null, KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
 				)),
 				getArguments(new SignCredentialTestInput(
-						SignatureAlgorithm.SHA256WithECDSA,
-						new KeyPairGenParameters(null, "secp256r1"),
+						KeyCertFixtures.SignatureAlgorithm.SHA256WithECDSA,
+						new KeyCertFixtures.KeyPairGenParameters(null, "secp256r1"),
 						DigestAlgorithm.SHA256, ISSUER_DID, false
 				), new SignCredentialTestExpectedValues(
-						"ES256", null, CERT_CHAIN_LENGTH, ISSUER_DID
+						"ES256", null, KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
 				)),
 				getArguments(new SignCredentialTestInput(
-						SignatureAlgorithm.SHA512WithECDSA,
-						new KeyPairGenParameters(null, "secp521r1"),
+						KeyCertFixtures.SignatureAlgorithm.SHA512WithECDSA,
+						new KeyCertFixtures.KeyPairGenParameters(null, "secp521r1"),
 						DigestAlgorithm.SHA512, ISSUER_DID, false
 				), new SignCredentialTestExpectedValues(
-						"ES512", null, CERT_CHAIN_LENGTH, ISSUER_DID
+						"ES512", null, KeyCertFixtures.CERT_CHAIN_LENGTH, ISSUER_DID
 				))
 		);
 	}
 
-	// SignatureAlgorithm for BouncyCastle - why do they have no enum?
-	// see: https://github.com/bcgit/bc-java/blob/main/pkix/src/main/java/org/bouncycastle/operator/DefaultSignatureAlgorithmIdentifierFinder.java
-	private enum SignatureAlgorithm {
-		SHA256WithRSA, SHA512WithRSA,
-		SHA256WithECDSA, SHA512WithECDSA
-	}
-
-	public record KeyPairGenParameters(Integer keySize, // RSA key size
-									   String ecStdName // EC generation parameter standard name
-	) {
-	}
-
-	public record SignCredentialTestInput(SignatureAlgorithm signatureAlgorithm,
-										  KeyPairGenParameters keyPairGenParameters,
+	public record SignCredentialTestInput(KeyCertFixtures.SignatureAlgorithm signatureAlgorithm,
+										  KeyCertFixtures.KeyPairGenParameters keyPairGenParameters,
 										  DigestAlgorithm digestAlgorithm,
 										  String vcIssuer,
 										  boolean includeSignatureType) {
@@ -282,153 +269,4 @@ public class JAdESCredentialSignerTest {
 		return credentialSubject;
 	}
 
-	// Class holding a key and a certificate
-	final static class KeyCert {
-		public final PrivateKey key;
-		public final X509Certificate cert;
-
-		public KeyCert(PrivateKey key, X509Certificate cert) {
-			this.key = key;
-			this.cert = cert;
-		}
-	}
-
-	// Create key / cert chain pairs consisting of client, intermediate and root CA certificate,
-	// and return it as Keycloak KeyWrapper
-	private KeyWrapper createClientKeyCertChain(SignatureAlgorithm signatureAlgorithm, KeyPairGenParameters keyPairGenParameters) throws NoSuchAlgorithmException, IOException, OperatorCreationException, CertificateException, KeyStoreException, InvalidAlgorithmParameterException {
-
-		KeyCert rootCAKeyCert = createKeyCert(
-				signatureAlgorithm, keyPairGenParameters,
-				createRootCertSubject(), null, 1L, true);
-		KeyCert intermediateKeyCert = createKeyCert(
-				signatureAlgorithm, keyPairGenParameters,
-				createIntermediateCertSubject(), rootCAKeyCert, 2L, true);
-		KeyCert clientKeyCert = createKeyCert(
-				signatureAlgorithm, keyPairGenParameters,
-				createClientCertSubject(), intermediateKeyCert, 3L, false);
-
-		KeyWrapper keyWrapper = new KeyWrapper();
-		keyWrapper.setPrivateKey(clientKeyCert.key);
-		keyWrapper.setCertificateChain(List.of(clientKeyCert.cert, intermediateKeyCert.cert, rootCAKeyCert.cert));
-		keyWrapper.setProviderId("java-keystore");
-
-		switch (signatureAlgorithm) {
-			case SHA256WithRSA:
-				keyWrapper.setAlgorithm(Algorithm.RS256);
-				break;
-			case SHA512WithRSA:
-				keyWrapper.setAlgorithm(Algorithm.RS512);
-				break;
-			case SHA256WithECDSA:
-				keyWrapper.setAlgorithm(Algorithm.ES256);
-				break;
-			case SHA512WithECDSA:
-				keyWrapper.setAlgorithm(Algorithm.ES512);
-				break;
-		}
-
-		return keyWrapper;
-	}
-
-	// Create a private key and certificate signed by an optional issuer key
-	private KeyCert createKeyCert(SignatureAlgorithm signatureAlgorithm, KeyPairGenParameters keyPairGenParameters, X500Name subjectDN, KeyCert issuer, long serial, boolean isCA) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateException, InvalidAlgorithmParameterException {
-
-		KeyPairGenerator kpg;
-		switch (signatureAlgorithm) {
-			case SHA256WithRSA:
-			case SHA512WithRSA:
-				//keyGenAlgorithm = "RSA";
-				kpg = KeyPairGenerator.getInstance("RSA");
-				kpg.initialize(keyPairGenParameters.keySize());
-				break;
-			case SHA256WithECDSA:
-			case SHA512WithECDSA:
-				kpg = KeyPairGenerator.getInstance("EC");
-				kpg.initialize(new ECGenParameterSpec(keyPairGenParameters.ecStdName()));
-				break;
-			default:
-				kpg = KeyPairGenerator.getInstance("RSA");
-				kpg.initialize(keyPairGenParameters.keySize());
-				break;
-		}
-
-		String signerAlgorithm = signatureAlgorithm.toString();
-		var keyPair = kpg.generateKeyPair();
-
-		BigInteger serialNumber = BigInteger.valueOf(serial);
-		Instant validFrom = Instant.now();
-		Instant validUntil = validFrom.plus(10 * 360, ChronoUnit.DAYS);
-
-		X500Name issuerSubjectDN;
-		PrivateKey issuerKey;
-		PrivateKey key = keyPair.getPrivate();
-		if (issuer == null) {
-			// No issuer --> self-sign
-			issuerSubjectDN = subjectDN;
-			issuerKey = key;
-		} else {
-			issuerSubjectDN = new JcaX509CertificateHolder((X509Certificate) issuer.cert).getSubject();
-			issuerKey = issuer.key;
-		}
-
-		JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
-				issuerSubjectDN,
-				serialNumber,
-				Date.from(validFrom), Date.from(validUntil),
-				subjectDN, keyPair.getPublic());
-		if (isCA) {
-			certBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
-		}
-
-		// Sign it
-		ContentSigner signer = new JcaContentSignerBuilder(signerAlgorithm).build(issuerKey);
-		X509CertificateHolder certHolder = certBuilder.build(signer);
-		X509Certificate cert = new JcaX509CertificateConverter().getCertificate(certHolder);
-
-		return new KeyCert(key, cert);
-
-	}
-
-	// Create the subject for the root CA cert
-	private X500Name createRootCertSubject() {
-		X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
-		builder.addRDN(BCStyle.C, "DE");
-		builder.addRDN(BCStyle.ST, "Berlin");
-		builder.addRDN(BCStyle.L, "Berlin");
-		builder.addRDN(BCStyle.O, "FIWARE CA");
-		builder.addRDN(BCStyle.CN, "FIWARE-CA");
-		builder.addRDN(BCStyle.EmailAddress, "ca@fiware.org");
-		builder.addRDN(BCStyle.SERIALNUMBER, "01");
-
-		return builder.build();
-	}
-
-	// Create the subject for the intermediate cert
-	private X500Name createIntermediateCertSubject() {
-		X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
-		builder.addRDN(BCStyle.C, "DE");
-		builder.addRDN(BCStyle.ST, "Berlin");
-		builder.addRDN(BCStyle.L, "Berlin");
-		builder.addRDN(BCStyle.O, "FIWARE CA TLS");
-		builder.addRDN(BCStyle.CN, "FIWARE-CA-TLS");
-		builder.addRDN(BCStyle.EmailAddress, "ca-tls@fiware.org");
-		builder.addRDN(BCStyle.SERIALNUMBER, "02");
-
-		return builder.build();
-	}
-
-	// Create the subject for the client cert
-	private X500Name createClientCertSubject() {
-		X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
-		builder.addRDN(BCStyle.C, "DE");
-		builder.addRDN(BCStyle.ST, "Berlin");
-		builder.addRDN(BCStyle.L, "Berlin");
-		builder.addRDN(BCStyle.O, "FIWARE Foundation");
-		builder.addRDN(BCStyle.CN, "FIWARE-Test");
-		builder.addRDN(BCStyle.EmailAddress, "test@fiware.org");
-		builder.addRDN(BCStyle.SERIALNUMBER, "03");
-		builder.addRDN(BCStyle.ORGANIZATION_IDENTIFIER, "VATDE-1234567");
-
-		return builder.build();
-	}
 }
