@@ -33,6 +33,14 @@
             <organization>FIWARE Foundation e.V.</organization>
             <organizationUrl>https://fiware.org</organizationUrl>
         </developer>
+        <developer>
+            <id>wistefan</id>
+            <name>Stefan Wiedemann</name>
+            <url>https://github.com/wistefan</url>
+            <email>stefan.wiedemann@seamware.com</email>
+            <organization>Seamless Middleware Technologies S.L.</organization>
+            <organizationUrl>https://seamware.com</organizationUrl>
+        </developer>
     </developers>
 
     <properties>
@@ -72,7 +80,7 @@
         <!--<version.org.keycloak-model-map.libs>22.0.5</version.org.keycloak-model-map.libs>-->
 
         <!-- DSS -->
-        <version.eu.europa.ec.joinup.sd-dss>6.0</version.eu.europa.ec.joinup.sd-dss>
+        <version.eu.europa.ec.joinup.sd-dss>6.5</version.eu.europa.ec.joinup.sd-dss>
 
         <!--
             Libraries the Keycloak distribution already ships in lib/main. They are declared "provided"
