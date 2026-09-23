@@ -16,12 +16,17 @@ import eu.europa.esig.dss.validation.CommonCertificateVerifier;
 import org.keycloak.crypto.KeyWrapper;
 import org.keycloak.protocol.oid4vc.issuance.token.KeycloakKeystoreSignatureTokenConnection;
 
+import org.bouncycastle.crypto.signers.PlainDSAEncoding;
+import org.bouncycastle.crypto.signers.StandardDSAEncoding;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.ECPrivateKey;
 
 /**
  * Signs a payload as a JAdES baseline-B compact JWS, as specified by ETSI TS 119 182-1.
@@ -52,6 +57,32 @@ public class JAdESCompactSigner {
     public JAdESCompactSigner(DigestAlgorithm digestAlgorithm, boolean includeSignatureType) {
         this.digestAlgorithm = digestAlgorithm;
         this.includeSignatureType = includeSignatureType;
+    }
+
+    /**
+     * Re-encodes a DER ECDSA signature into the fixed-width R||S form that RFC 7518 requires, using the
+     * curve order of the signing key.
+     * <p>
+     * DSS does this conversion itself, but infers the curve order from the signature value
+     * ({@code DSSASN1Utils.toPlainDSASignatureValue}). That guess is one byte short whenever the leading
+     * byte of R or S is zero, which for P-521 happens for roughly half of all signatures - the top byte
+     * carries a single bit - and yields a 130 byte ES512 signature where 132 is required. Converting here
+     * with the real order leaves DSS nothing to guess: it passes an already-plain value through untouched.
+     *
+     * @param signatureValue signature to re-encode in place; left alone for non-EC keys
+     * @param privateKey     key the signature was produced with, which carries the curve parameters
+     */
+    private void toFixedWidthEcdsaSignature(SignatureValue signatureValue, Object privateKey) {
+        if (!(privateKey instanceof ECPrivateKey ecPrivateKey)) {
+            return;
+        }
+        BigInteger order = ecPrivateKey.getParams().getOrder();
+        try {
+            BigInteger[] rs = StandardDSAEncoding.INSTANCE.decode(order, signatureValue.getValue());
+            signatureValue.setValue(PlainDSAEncoding.INSTANCE.encode(order, rs[0], rs[1]));
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not re-encode the ECDSA signature for the JWS.", e);
+        }
     }
 
     /**
@@ -90,6 +121,7 @@ public class JAdESCompactSigner {
 
         try (SignatureTokenConnection signingToken = new KeycloakKeystoreSignatureTokenConnection(signingKey)) {
             SignatureValue signatureValue = signingToken.sign(dataToSign, parameters.getDigestAlgorithm(), privateKey);
+            toFixedWidthEcdsaSignature(signatureValue, signingKey.getPrivateKey());
             DSSDocument signedDocument = service.signDocument(toSignDocument, parameters, signatureValue);
 
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
