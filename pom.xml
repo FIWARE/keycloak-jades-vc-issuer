@@ -75,8 +75,8 @@
 
         <!-- keycloak -->
         <version.org.keycloak.libs>26.8.0</version.org.keycloak.libs>
-        <version.org.keycloak-common.libs>26.7.3</version.org.keycloak-common.libs>
-        <version.org.keycloak-core.libs>26.7.3</version.org.keycloak-core.libs>
+        <version.org.keycloak-common.libs>26.8.0</version.org.keycloak-common.libs>
+        <version.org.keycloak-core.libs>26.8.0</version.org.keycloak-core.libs>
         <!--<version.org.keycloak-model-map.libs>22.0.5</version.org.keycloak-model-map.libs>-->
 
         <!-- DSS -->
