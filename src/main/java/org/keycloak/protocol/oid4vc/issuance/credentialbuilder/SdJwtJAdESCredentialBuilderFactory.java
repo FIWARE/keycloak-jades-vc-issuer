@@ -19,8 +19,6 @@ import java.util.List;
 @AutoService(CredentialBuilderFactory.class)
 public class SdJwtJAdESCredentialBuilderFactory implements CredentialBuilderFactory {
 
-    private static final String HELP_TEXT =
-            "Builds SD-JWT VCs, optionally marked for JAdES signing following ETSI TS 119 182-1.";
 
     @Override
     public String getSupportedFormat() {
@@ -28,17 +26,8 @@ public class SdJwtJAdESCredentialBuilderFactory implements CredentialBuilderFact
     }
 
     @Override
-    public CredentialBuilder create(KeycloakSession session, ComponentModel model) {
+    public CredentialBuilder create(KeycloakSession session) {
         return new SdJwtJAdESCredentialBuilder(session);
     }
 
-    @Override
-    public String getHelpText() {
-        return HELP_TEXT;
-    }
-
-    @Override
-    public List<ProviderConfigProperty> getConfigProperties() {
-        return List.of();
-    }
 }
